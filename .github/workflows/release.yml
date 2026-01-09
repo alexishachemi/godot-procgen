@@ -1,0 +1,67 @@
+name: Release Addon On Version Change
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    env:
+      SKIP: "0"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find plugin.cfg file
+        id: find_plugin_cfg
+        run: |
+          PLUGIN_CFG=$(find addons -mindepth 2 -maxdepth 2 -name plugin.cfg | head -n 1)
+          if [ -z "$PLUGIN_CFG" ]; then
+            echo "SKIP=1" >> $GITHUB_ENV
+          else
+            echo "PLUGIN_CFG=$PLUGIN_CFG" >> $GITHUB_ENV
+          fi
+
+      - name: Read version from plugin.cfg
+        id: read_version
+        if: env.SKIP == '0'
+        run: |
+          VERSION=$(grep -oP '^version="\K[^"]+' "$PLUGIN_CFG")
+          if [ -z "$VERSION" ] || [ "$VERSION" = "0.0" ]; then
+            echo "SKIP=1" >> $GITHUB_ENV
+          else
+            echo "RELEASE_VERSION=$VERSION" >> $GITHUB_ENV
+          fi
+
+      - name: Check if release already exists
+        id: check_release
+        if: env.SKIP == '0'
+        run: |
+          RELEASE_EXISTS=$(gh release list --limit 100 | grep -w "$RELEASE_VERSION" || true)
+          if [ -n "$RELEASE_EXISTS" ]; then
+            echo "SKIP=1" >> $GITHUB_ENV
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Zip addons folder
+        if: env.SKIP == '0'
+        run: zip -r addons.zip addons
+
+      - name: Create GitHub Release
+        if: env.SKIP == '0'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_VERSION }}
+          name: Release ${{ env.RELEASE_VERSION }}
+          body: Automated release of ${{ github.repository }} ${{ env.RELEASE_VERSION }}
+          files: addons.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Print skip message
+        if: env.SKIP == '1'
+        run: echo "No new version to release. Skipping workflow."
