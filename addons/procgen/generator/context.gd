@@ -11,7 +11,7 @@ var room_min_coverage_ratio: float
 var room_max_coverage_ratio: float
 var room_center_ratio: float
 
-var corridor_touch_min_ratio: float
+var corridor_edge_overlap_min_ratio: float
 var corridor_cycle_chance: float
 
 var automaton_iterations: int
