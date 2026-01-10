@@ -16,14 +16,21 @@ var sub1: Bsp = null
 var sub2: Bsp = null
 
 func generate():
-	split(SplitOrientation.HORIZONTAL)
-	print(self)
+	split_recursive()
+	print_tree()
 
 func _init(ctx: Context) -> void:
 	self.ctx = ctx
 	rect = Rect2i(0, 0, ctx.map_size.x, ctx.map_size.y)
 
 # Split ########################################################################
+
+func split_recursive():
+	var orientation = SplitOrientation.values()[ctx.rng.randi() % 2]
+	for i in range(ctx.room_amount - 1):
+		get_shallowest_leaf().split(orientation)
+		if ctx.rng.randf() < ctx.zone_orientation_alternate_chance:
+			orientation = alternate_split_orientation(orientation)
 
 func split(orientation: SplitOrientation):
 	split_orientation = orientation
@@ -44,6 +51,18 @@ func split(orientation: SplitOrientation):
 	sub1 = create_child(rect1)
 	sub2 = create_child(rect2)
 
+func get_shallowest_leaf() -> Bsp:
+	return _traverse_to_shallowest(self, null)
+
+static func _traverse_to_shallowest(bsp: Bsp, shallowest: Bsp) -> Bsp:
+	if bsp.is_leaf():
+		if not shallowest or bsp.depth < shallowest.depth:
+			return bsp
+		return shallowest
+	shallowest = _traverse_to_shallowest(bsp.sub1, shallowest)
+	shallowest = _traverse_to_shallowest(bsp.sub2, shallowest)
+	return shallowest
+
 # Utils ########################################################################
 
 func create_child(rect: Rect2i) -> Bsp:
@@ -55,16 +74,18 @@ func create_child(rect: Rect2i) -> Bsp:
 func is_leaf() -> bool:
 	return sub1 == null
 
-func _to_string() -> String:
-	return get_tree_string()
+func print_tree():
+	print_rich(_get_tree_string())
 
-func get_tree_string(indent: String = "") -> String:
+func _get_tree_string(indent: String = "") -> String:
 	var str: String = "[rect: %s; room: %s; depth: %s; split: %s]" % [
 		rect, room_rect, depth, get_split_orientation_str(split_orientation)
 	]
-	if not is_leaf():
-		str += "\n" + indent + "├──" + sub1.get_tree_string(indent + "│  ")
-		str += "\n" + indent + "└──" +sub2.get_tree_string(indent + "   ")
+	if is_leaf():
+		str = "[color=light_green]%s[/color]" % str
+	else:
+		str += "\n" + indent + "├──" + sub1._get_tree_string(indent + "│  ")
+		str += "\n" + indent + "└──" +sub2._get_tree_string(indent + "   ")
 	return str
 
 static func get_split_orientation_str(orientation: SplitOrientation) -> String:
@@ -72,3 +93,8 @@ static func get_split_orientation_str(orientation: SplitOrientation) -> String:
 		SplitOrientation.HORIZONTAL: return "H"
 		SplitOrientation.VERTICAL: return "V"
 	return "U"
+
+static func alternate_split_orientation(orientation: SplitOrientation) -> SplitOrientation:
+	if orientation == SplitOrientation.HORIZONTAL:
+		return SplitOrientation.VERTICAL
+	return SplitOrientation.HORIZONTAL
