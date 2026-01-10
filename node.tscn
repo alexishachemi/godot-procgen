@@ -1,10 +1,18 @@
-[gd_scene load_steps=2 format=3 uid="uid://2wng6einj3df"]
+[gd_scene load_steps=3 format=3 uid="uid://2wng6einj3df"]
 
 [ext_resource type="Script" uid="uid://dhph4w3w8vsll" path="res://addons/procgen/procgen.gd" id="1_sy5k4"]
+[ext_resource type="Script" uid="uid://b03qhwknqbatw" path="res://addons/procgen/visualizer.gd" id="2_j2q8x"]
 
 [node name="Node" type="Node"]
 script = ExtResource("1_sy5k4")
 map_size = Vector2i(100, 100)
-room_amount = 3
-room_min_coverage_ratio = 0.99
-room_max_coverage_ratio = 0.99
+seed = 3730832810
+room_amount = 7
+room_min_coverage = null
+room_max_coverage = null
+room_center_ratio = 0.8
+corridor_edge_overlap_min_ratio = 0.5
+
+[node name="Node2D" type="Node2D" parent="." node_paths=PackedStringArray("generator")]
+script = ExtResource("2_j2q8x")
+generator = NodePath("..")

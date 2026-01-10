@@ -7,8 +7,8 @@ var zone_orientation_alternate_chance: float
 
 var room_amount: int
 var room_max_ratio: float
-var room_min_coverage_ratio: float
-var room_max_coverage_ratio: float
+var room_min_coverage: float
+var room_max_coverage: float
 var room_center_ratio: float
 
 var corridor_edge_overlap_min_ratio: float

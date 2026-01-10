@@ -1,16 +1,21 @@
+@tool
 class_name ProcGen extends Node
 
 signal finished
 
 const Context = preload("generator/context.gd")
 
-#@export_tool_button("Generate") var _generate_callback = generate
+@export_tool_button("Generate") var _generate_callback = generate
 @export var map_size: Vector2i = Vector2i(300, 300):
 	set(value): map_size = Vector2i.ONE.max(value)
 
-## Custom seed to apply to the generator. Leave empty to generate a new seed
-## on each run.
-@export var seed: String
+## Generates a new seed and writes it to [member ProcGen.seed] before running
+## a generation.
+@export var generate_new_seed_on_run: bool = true
+
+## Seed used by the generator's random number generator. Will be overwritten if
+## [member ProcGen.generate_new_seed_on_run] is set to [code]true[/code].
+@export var seed: int
 
 @export_group("Zones", "zone")
 
@@ -19,38 +24,38 @@ const Context = preload("generator/context.gd")
 ## dictates how larger zone A can be over zone B) [br]
 ## [code]0.5[/code] -> The split will always be in the middle [br]
 ## [code]0.7[/code] -> The split will be between 30%~70% of the zone's length
-@export_range(0.5, 0.99) var zone_split_max_ratio: float = 0.5
+@export_range(0.5, 0.99) var zone_split_max_ratio: float = 0.6
 
 ## The chance that a zone uses the same split orientation as its parent. [br]
 ## For example, given zone A that was split [i]horizontally[/i] 
 ## to produce zone B and C: [br]
 ## [code]0.0[/code] -> Zone B will be split [i]horizontally[/i] like its parent
 ## zone A. [br]
-## [code]0.1[/code] -> Zone B will be split [i]vertically[/i], opposite to its
+## [code]1.0[/code] -> Zone B will be split [i]vertically[/i], opposite to its
 ## parent. [br]
 ## [code]0.5[/code] -> 50% chance of being split either [i]horizontally[/i] or
 ## [i]vertically[/i]
-@export_range(0.0, 1.0, 0.01) var zone_orientation_alternate_chance: float = 0.5
+@export_range(0.0, 1.0, 0.01) var zone_orientation_alternate_chance: float = 0.9
 
 @export_group("Rooms", "room")
 
 ## The amount of rooms that will be generated.
 @export_range(1, 1, 1, "or_greater") var room_amount: int
 
-## The maximum ratio of a room, basically how rectangular it is. [br]
-## [code]0.5[/code] -> Rooms are always squares [br]
-## [code]0.7[/code] -> Width will be between 30%~70% bigger/smaller than height
-@export_range(0.5, 0.99) var room_max_ratio: float
+## The maximum ratio of a room's width to its height. [br]
+## [code]1.0[/code] -> Width and height are always the same (square rooms) [br]
+## [code]2.0[/code] -> Width can be up to 2x bigger/smaller than height
+@export_range(1.0, 2.0) var room_max_ratio: float
 
-## The minimum coverage ratio of a room. Coverage is how much of the zone the
+## The minimum coverage of a room. Coverage is how much of the zone the
 ## room occupies.
-@export_range(0.01, 0.99, 0.01) var room_min_coverage_ratio: float:
-	set(value): room_min_coverage_ratio = min(value, room_max_coverage_ratio)
+@export_range(0.01, 1.0, 0.01) var room_min_coverage: float:
+	set(value): room_min_coverage = min(value, room_max_coverage)
 
-## The maximum coverage ratio of a room. Coverage is how much of the zone the
+## The maximum coverage of a room. Coverage is how much of the zone the
 ## room occupies.
-@export_range(0.01, 0.99, 0.01) var room_max_coverage_ratio: float:
-	set(value): room_max_coverage_ratio = max(value, room_min_coverage_ratio)
+@export_range(0.01, 1.0, 0.01) var room_max_coverage: float:
+	set(value): room_max_coverage = max(value, room_min_coverage)
 
 ## How centered is a room inside its zone. [br]
 ## [code]0.0[/code] -> Rooms can be anywhere inside their zone. [br]
@@ -114,8 +119,8 @@ func generate():
 
 	ctx.room_amount = room_amount
 	ctx.room_max_ratio = room_max_ratio
-	ctx.room_min_coverage_ratio = room_min_coverage_ratio
-	ctx.room_max_coverage_ratio = room_max_coverage_ratio
+	ctx.room_min_coverage = room_min_coverage
+	ctx.room_max_coverage = room_max_coverage
 	ctx.room_center_ratio = room_center_ratio
 
 	ctx.corridor_edge_overlap_min_ratio = corridor_edge_overlap_min_ratio
@@ -127,9 +132,8 @@ func generate():
 	ctx.automaton_noise_rate = automaton_noise_rate
 	ctx.automaton_flood_fill = automaton_flood_fill
 	
-	if seed.is_empty():
-		ctx.rng.randomize()
-	else:
-		ctx.rng.seed = seed.hash()
+	if generate_new_seed_on_run:
+		seed = randi()
+	ctx.rng.seed = seed
 	
 	_generator.generate(ctx)

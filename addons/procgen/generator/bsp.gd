@@ -17,6 +17,7 @@ var south_frontiers: Array[BSP]
 var west_frontiers: Array[BSP]
 var east_frontiers: Array[BSP]
 var adjacents: Array[BSP]
+var group: Array[BSP]
 
 var sub1: BSP = null
 var sub2: BSP = null
@@ -32,42 +33,52 @@ func _init(ctx: Context) -> void:
 #region Split ##################################################################
 
 func split_recursive():
-	var orientation = SplitOrientation.values()[ctx.rng.randi() % 2]
+	var base_orient = SplitOrientation.values()[ctx.rng.randi() % 2]
+	var orient: SplitOrientation
+	var leaf: BSP
 	for i in range(ctx.room_amount - 1):
-		get_shallowest_leaf().split(orientation)
-		if ctx.rng.randf() < ctx.zone_orientation_alternate_chance:
-			orientation = alternate_split_orientation(orientation)
+		leaf = get_shallowest_leaf()
+		if leaf.depth != 0 \
+		and leaf.depth % 2 == 0 \
+		and ctx.rng.randf() < ctx.zone_orientation_alternate_chance:
+			orient = alternate_split_orientation(base_orient)
+		else:
+			orient = base_orient
+		leaf.split(orient)
 
 func split(orientation: SplitOrientation):
 	split_orientation = orientation
 	var rect1: Rect2i
 	var rect2: Rect2i
 	if orientation == SplitOrientation.HORIZONTAL:
-		var min_n := rect.size.y * ctx.zone_split_max_ratio
-		var max_n := rect.size.y - min_n
+		var min_n: int = max(1, rect.size.y / 2)
+		min_n = max(min_n, round(rect.size.y * ctx.zone_split_max_ratio))
+		var max_n: int = clamp(rect.size.y - min_n, 1, rect.size.y)
 		var n: int = ctx.rng.randi_range(min_n, max_n)
 		rect1 = Rect2i(rect.position, Vector2i(rect.size.x, n))
 		rect2 = Rect2i(rect.position.x, rect.position.y + n, rect.size.x, rect.size.y - rect1.size.y)
 	else:
-		var min_n := rect.size.x * ctx.zone_split_max_ratio
-		var max_n := rect.size.x - min_n
+		var min_n: int = max(1, rect.size.x / 2)
+		min_n = max(min_n, round(rect.size.x * ctx.zone_split_max_ratio))
+		var max_n: int = clamp(rect.size.x - min_n, 1, rect.size.x)
 		var n: int = ctx.rng.randi_range(min_n, max_n)
 		rect1 = Rect2i(rect.position, Vector2i(n, rect.size.y))
 		rect2 = Rect2i(rect.position.x + n, rect.position.y, rect.size.x - rect1.size.x, rect.size.y)
 	sub1 = create_child(rect1)
 	sub2 = create_child(rect2)
 
-func get_shallowest_leaf() -> BSP:
-	return _traverse_to_shallowest(self, null)
-
-static func _traverse_to_shallowest(bsp: BSP, shallowest: BSP) -> BSP:
-	if bsp.is_leaf():
-		if not shallowest or bsp.depth < shallowest.depth:
-			return bsp
+func get_shallowest_leaf(shallowest: BSP = null) -> BSP:
+	if is_leaf():
+		if not shallowest or depth < shallowest.depth:
+			return self
 		return shallowest
-	shallowest = _traverse_to_shallowest(bsp.sub1, shallowest)
-	shallowest = _traverse_to_shallowest(bsp.sub2, shallowest)
-	return shallowest
+	var first_checked := sub1
+	var seconds_checked := sub2
+	if ctx.rng.randi() % 2:
+		first_checked = sub2
+		seconds_checked = sub1
+	shallowest = first_checked.get_shallowest_leaf(shallowest)
+	return seconds_checked.get_shallowest_leaf(shallowest)
 
 #endregion #####################################################################
 
@@ -89,18 +100,30 @@ func generate_room():
 		rect_area * ctx.room_min_coverage_ratio,
 		rect_area * ctx.room_max_coverage_ratio
 	)
-	var n_max: int = mini(sqrt(room_area), mini(rect.size.x, rect.size.y))
-	var n_min: int = n_max * ctx.room_max_ratio
-	var n := max(1, ctx.rng.randi_range(n_min, n_max))
+	var size_ratio: float = randf_range(1.0, ctx.room_max_ratio)
+	var height: int = int(round(sqrt(room_area / size_ratio)))
+	var width: int = int(round(height * size_ratio))
 	if ctx.rng.randi() % 2:
-		room_size = Vector2i(n, min(room_area / n, rect.size.y))
-	else:
-		room_size = Vector2i(min(room_area / n, rect.size.x), n)
+		var tmp := width
+		width = height
+		height = tmp
+	if width > rect.size.x:
+		height += width - rect.size.x
+	if height > rect.size.y:
+		width += height - rect.size.y
+	if width * height < room_area:
+		if width < height * size_ratio:
+			width += 1
+		else:
+			height += 1
+	room_size = Vector2i(width, height).min(rect.size)
 	var margins := (rect.size - room_size) / 2
 	var offset := Vector2i(
 		ctx.rng.randi_range(0, margins.x * ctx.room_center_ratio),
 		ctx.rng.randi_range(0, margins.y * ctx.room_center_ratio)
 	)
+	if ctx.rng.randi() % 2:
+		offset *= -1
 	room_rect = Rect2i(rect.position + margins + offset, room_size)
 
 func generate_frontiers():
@@ -133,11 +156,11 @@ func match_adjacents():
 		frontiers_2 = sub2.west_frontiers
 	for b1 in frontiers_1:
 		for b2 in frontiers_2:
-			if _get_edge_overlap(b1.rect, b2.rect) >= ctx.corridor_edge_overlap_min_ratio:
+			if _edges_overlap(b1.rect, b2.rect):
 				b1.adjacents.append(b2)
 				b2.adjacents.append(b1)
 
-func _get_edge_overlap(r1: Rect2i, r2: Rect2i) -> int:
+func _edges_overlap(r1: Rect2i, r2: Rect2i) -> bool:
 	var x1: int = r1.position.x
 	var y1: int = r1.position.y
 	var w1: int = r1.size.x
@@ -150,9 +173,13 @@ func _get_edge_overlap(r1: Rect2i, r2: Rect2i) -> int:
 
 	if x1 + w1 == x2 or x2 + w2 == x1:
 		overlap = min(y1 + h1, y2 + h2) - max(y1, y2)
+		return overlap > 30
+		return max(overlap, 0) >= min(x1, x2) * ctx.corridor_edge_overlap_min_ratio
 	elif y1 + h1 == y2 or y2 + h2 == y1:
 		overlap = min(x1 + w1, x2 + w2) - max(x1, x2)
-	return max(overlap, 0)
+		return overlap > 30
+		return max(overlap, 0) >= min(y1, y2) * ctx.corridor_edge_overlap_min_ratio
+	return 0
 
 #endregion #####################################################################
 
@@ -196,5 +223,35 @@ static func alternate_split_orientation(orientation: SplitOrientation) -> SplitO
 	if orientation == SplitOrientation.HORIZONTAL:
 		return SplitOrientation.VERTICAL
 	return SplitOrientation.HORIZONTAL
+
+#endregion #####################################################################
+
+#region Graph ##################################################################
+
+#class NavTree:
+	#class Link:
+		#var b1: BSP
+		#var b2: BSP
+		#
+		#func _init(b1: BSP, b2: BSP):
+			#self.b1 = b1
+			#self.b2 = b2
+	#class Nav:
+		#var visited: Array[BSP]
+		#var links: Array[Link]
+#
+		#func traverse(bsp: BSP):
+			#if not bsp.is_leaf():
+				#traverse(bsp.sub1)
+			#visited.append(bsp)
+			#for adjacent in bsp.adjacents:
+				#links.append(Link.new(bsp, adjacent))
+				#if not visited.has(adjacent):
+					#traverse(adjacent)
+	#
+	#func generate(bsp: BSP):
+		#var nav := Nav.new()
+		#nav.traverse(bsp)
+		#
 
 #endregion #####################################################################
