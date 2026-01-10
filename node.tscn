@@ -4,4 +4,4 @@
 
 [node name="Node" type="Node"]
 script = ExtResource("1_sy5k4")
-automaton_flood_fill = null
+map_size = Vector2i(10, 10)

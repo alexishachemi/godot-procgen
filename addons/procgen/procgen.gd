@@ -2,9 +2,15 @@ class_name ProcGen extends Node
 
 signal finished
 
+const Context = preload("generator/context.gd")
+
 #@export_tool_button("Generate") var _generate_callback = generate
-@export var map_size: Vector2i:
+@export var map_size: Vector2i = Vector2i(300, 300):
 	set(value): map_size = Vector2i.ONE.max(value)
+
+## Custom seed to apply to the generator. Leave empty to generate a new seed
+## on each run.
+@export var seed: String
 
 @export_group("Zones", "zone")
 
@@ -13,7 +19,7 @@ signal finished
 ## dictates how larger zone A can be over zone B) [br]
 ## [code]0.5[/code] -> The split will always be in the middle [br]
 ## [code]0.7[/code] -> The split will be between 30%~70% of the zone's length
-@export_range(0.5, 0.99) var zone_split_max_ratio: float
+@export_range(0.5, 0.99) var zone_split_max_ratio: float = 0.5
 
 ## The chance that a zone uses the same split orientation as its parent. [br]
 ## For example, given zone A that was split [i]horizontally[/i] 
@@ -24,7 +30,7 @@ signal finished
 ## parent. [br]
 ## [code]0.5[/code] -> 50% chance of being split either [i]horizontally[/i] or
 ## [i]vertically[/i]
-@export_range(0.0, 1.0, 0.01) var zone_orientation_alternate_chance: float
+@export_range(0.0, 1.0, 0.01) var zone_orientation_alternate_chance: float = 0.5
 
 @export_group("Rooms", "room")
 
@@ -92,30 +98,38 @@ signal finished
 ## automaton iterations.
 @export var automaton_flood_fill: bool
 
-var _generator = preload("generator/generator.gd").new()
+var _generator := preload("generator/generator.gd").new()
 
 func _ready() -> void:
 	_generator.finished.connect(finished.emit)
+	generate()
 
 func generate():
-	_generator.map_size = map_size
-
-	_generator.zone_split_max_ratio = zone_split_max_ratio
-	_generator.zone_orientation_alternate_chance = zone_orientation_alternate_chance
-
-	_generator.room_amount = room_amount
-	_generator.room_max_ratio = room_max_ratio
-	_generator.room_min_coverage_ratio = room_min_coverage_ratio
-	_generator.room_max_coverage_ratio = room_max_coverage_ratio
-	_generator.room_center_ratio = room_center_ratio
-
-	_generator.corridor_touch_min_ratio = corridor_touch_min_ratio
-	_generator.corridor_cycle_chance = corridor_cycle_chance
-
-	_generator.automaton_iterations = automaton_iterations
-	_generator.automaton_cell_min_neighbors = automaton_cell_min_neighbors
-	_generator.automaton_cell_max_neighbors = automaton_cell_max_neighbors
-	_generator.automaton_noise_rate = automaton_noise_rate
-	_generator.automaton_flood_fill = automaton_flood_fill
+	var ctx := Context.new()
 	
-	_generator.generate()
+	ctx.map_size = map_size
+
+	ctx.zone_split_max_ratio = zone_split_max_ratio
+	ctx.zone_orientation_alternate_chance = zone_orientation_alternate_chance
+
+	ctx.room_amount = room_amount
+	ctx.room_max_ratio = room_max_ratio
+	ctx.room_min_coverage_ratio = room_min_coverage_ratio
+	ctx.room_max_coverage_ratio = room_max_coverage_ratio
+	ctx.room_center_ratio = room_center_ratio
+
+	ctx.corridor_touch_min_ratio = corridor_touch_min_ratio
+	ctx.corridor_cycle_chance = corridor_cycle_chance
+
+	ctx.automaton_iterations = automaton_iterations
+	ctx.automaton_cell_min_neighbors = automaton_cell_min_neighbors
+	ctx.automaton_cell_max_neighbors = automaton_cell_max_neighbors
+	ctx.automaton_noise_rate = automaton_noise_rate
+	ctx.automaton_flood_fill = automaton_flood_fill
+	
+	if seed.is_empty():
+		ctx.rng.randomize()
+	else:
+		ctx.rng.seed = seed.hash()
+	
+	_generator.generate(ctx)
