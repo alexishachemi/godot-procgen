@@ -30,7 +30,8 @@ func _init(ctx: Context) -> void:
 func generate():
 	split_recursive()
 	generate_internal_data()
-	print()
+	var graph := Graph.new()
+	graph.generate(self)
 
 func generate_internal_data():
 	if is_leaf():
@@ -40,6 +41,50 @@ func generate_internal_data():
 		sub2.generate_internal_data()
 	generate_frontiers()
 	match_adjacents()
+
+#region Utils ##################################################################
+
+func create_child(rect: Rect2i) -> BSP:
+	var child := BSP.new(ctx)
+	child.depth = depth + 1
+	child.rect = rect
+	child.parent = self
+	return child
+
+func is_leaf() -> bool:
+	return sub1 == null
+
+func get_leaves() -> Array[BSP]:
+	if is_leaf():
+		return [self]
+	return sub1.get_leaves() + sub2.get_leaves()
+
+func print_tree():
+	print_rich(_get_tree_string())
+
+func _get_tree_string(indent: String = "") -> String:
+	var str: String = "[rect: %s; room: %s; depth: %s; split: %s]" % [
+		rect, room_rect, depth, get_split_orientation_str(split_orientation)
+	]
+	if is_leaf():
+		str = "[color=light_green]%s[/color]" % str
+	else:
+		str += "\n" + indent + "├──" + sub1._get_tree_string(indent + "│  ")
+		str += "\n" + indent + "└──" +sub2._get_tree_string(indent + "   ")
+	return str
+
+static func get_split_orientation_str(orientation: SplitOrientation) -> String:
+	match orientation:
+		SplitOrientation.HORIZONTAL: return "H"
+		SplitOrientation.VERTICAL: return "V"
+	return "U"
+
+static func alternate_split_orientation(orientation: SplitOrientation) -> SplitOrientation:
+	if orientation == SplitOrientation.HORIZONTAL:
+		return SplitOrientation.VERTICAL
+	return SplitOrientation.HORIZONTAL
+
+#endregion #####################################################################
 
 #region Split ##################################################################
 
@@ -200,83 +245,41 @@ func _get_biggest_overlap_ratio(r1: Rect2i, r2: Rect2i) -> float:
 	if denom1 <= 0.0 or denom2 <= 0.0:
 		return 0.0
 
-	var val := maxf(overlap / denom1, overlap / denom2)
-	print("%s %s %s %s" % [overlap, denom1, denom2, val])
-	return val
+	return maxf(overlap / denom1, overlap / denom2)
 
-
-#endregion #####################################################################
-
-#region Utils ##################################################################
-
-func create_child(rect: Rect2i) -> BSP:
-	var child := BSP.new(ctx)
-	child.depth = depth + 1
-	child.rect = rect
-	child.parent = self
-	return child
-
-func is_leaf() -> bool:
-	return sub1 == null
-
-func get_leaves() -> Array[BSP]:
-	if is_leaf():
-		return [self]
-	return sub1.get_leaves() + sub2.get_leaves()
-
-func print_tree():
-	print_rich(_get_tree_string())
-
-func _get_tree_string(indent: String = "") -> String:
-	var str: String = "[rect: %s; room: %s; depth: %s; split: %s]" % [
-		rect, room_rect, depth, get_split_orientation_str(split_orientation)
-	]
-	if is_leaf():
-		str = "[color=light_green]%s[/color]" % str
-	else:
-		str += "\n" + indent + "├──" + sub1._get_tree_string(indent + "│  ")
-		str += "\n" + indent + "└──" +sub2._get_tree_string(indent + "   ")
-	return str
-
-static func get_split_orientation_str(orientation: SplitOrientation) -> String:
-	match orientation:
-		SplitOrientation.HORIZONTAL: return "H"
-		SplitOrientation.VERTICAL: return "V"
-	return "U"
-
-static func alternate_split_orientation(orientation: SplitOrientation) -> SplitOrientation:
-	if orientation == SplitOrientation.HORIZONTAL:
-		return SplitOrientation.VERTICAL
-	return SplitOrientation.HORIZONTAL
 
 #endregion #####################################################################
 
 #region Graph ##################################################################
 
-#class NavTree:
-	#class Link:
-		#var b1: BSP
-		#var b2: BSP
-		#
-		#func _init(b1: BSP, b2: BSP):
-			#self.b1 = b1
-			#self.b2 = b2
-	#class Nav:
-		#var visited: Array[BSP]
-		#var links: Array[Link]
-#
-		#func traverse(bsp: BSP):
-			#if not bsp.is_leaf():
-				#traverse(bsp.sub1)
-			#visited.append(bsp)
-			#for adjacent in bsp.adjacents:
-				#links.append(Link.new(bsp, adjacent))
-				#if not visited.has(adjacent):
-					#traverse(adjacent)
-	#
-	#func generate(bsp: BSP):
-		#var nav := Nav.new()
-		#nav.traverse(bsp)
-		#
+class Graph:
+
+	func generate(bsp: BSP):
+		var nav := Nav.new()
+		nav.traverse(bsp)
+
+	class Nav:
+		var visited: Array[BSP]
+		var links: Array[Array]
+		
+		func traverse(bsp: BSP):
+			if not bsp.is_leaf():
+				traverse(bsp.sub1)
+				traverse(bsp.sub2)
+				return
+			if visited.has(bsp):
+				return
+			visited.append(bsp)
+			for adjacent in bsp.adjacents:
+				add_link(bsp, adjacent)
+		
+		func add_link(b1: BSP, b2: BSP):
+			if links.find_custom(_link_has_members.bind(b1, b2)) == -1:
+				links.append([b1, b2])
+		
+		static func _link_has_members(link: Array, m1: BSP, m2: BSP) -> bool:
+			return (link[0] == m1 and link[1] == m2) \
+				or (link[1] == m1 and link[0] == m2)
+
 
 #endregion #####################################################################
