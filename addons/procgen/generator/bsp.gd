@@ -19,6 +19,7 @@ var east_frontiers: Array[BSP]
 var adjacents: Array[BSP]
 var group: Array[BSP]
 
+var parent: BSP = null
 var sub1: BSP = null
 var sub2: BSP = null
 
@@ -33,17 +34,17 @@ func _init(ctx: Context) -> void:
 #region Split ##################################################################
 
 func split_recursive():
-	var base_orient = SplitOrientation.values()[ctx.rng.randi() % 2]
+	print()
 	var orient: SplitOrientation
 	var leaf: BSP
 	for i in range(ctx.room_amount - 1):
 		leaf = get_shallowest_leaf()
-		if leaf.depth != 0 \
-		and leaf.depth % 2 == 0 \
-		and ctx.rng.randf() < ctx.zone_orientation_alternate_chance:
-			orient = alternate_split_orientation(base_orient)
+		if leaf.parent == null:
+			orient = SplitOrientation.values()[ctx.rng.randi() % 2]
+		elif ctx.rng.randf() < ctx.zone_parent_inverse_orientation_chance:
+			orient = alternate_split_orientation(leaf.parent.split_orientation)
 		else:
-			orient = base_orient
+			orient = leaf.parent.split_orientation
 		leaf.split(orient)
 
 func split(orientation: SplitOrientation):
@@ -202,6 +203,7 @@ func create_child(rect: Rect2i) -> BSP:
 	var child := BSP.new(ctx)
 	child.depth = depth + 1
 	child.rect = rect
+	child.parent = self
 	return child
 
 func is_leaf() -> bool:

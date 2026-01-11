@@ -3,7 +3,7 @@ extends RefCounted
 var map_size: Vector2i
 
 var zone_split_max_ratio: float
-var zone_orientation_alternate_chance: float
+var zone_parent_inverse_orientation_chance: float
 
 var room_amount: int
 var room_min_coverage: float

@@ -26,7 +26,7 @@ const Context = preload("generator/context.gd")
 ## [code]0.7[/code] -> The split will be between 30%~70% of the zone's length
 @export_range(0.5, 0.99) var zone_split_max_ratio: float = 0.6
 
-## The chance that a zone uses the same split orientation as its parent. [br]
+## The chance that a zone uses the opposite split orientation as its parent. [br]
 ## For example, given zone A that was split [i]horizontally[/i] 
 ## to produce zone B and C: [br]
 ## [code]0.0[/code] -> Zone B will be split [i]horizontally[/i] like its parent
@@ -35,7 +35,7 @@ const Context = preload("generator/context.gd")
 ## parent. [br]
 ## [code]0.5[/code] -> 50% chance of being split either [i]horizontally[/i] or
 ## [i]vertically[/i]
-@export_range(0.0, 1.0, 0.01) var zone_orientation_alternate_chance: float = 0.9
+@export_range(0.0, 1.0, 0.01) var zone_parent_inverse_orientation_chance: float = 0.9
 
 @export_group("Rooms", "room")
 
@@ -125,7 +125,7 @@ func generate():
 	ctx.map_size = map_size
 
 	ctx.zone_split_max_ratio = zone_split_max_ratio
-	ctx.zone_orientation_alternate_chance = zone_orientation_alternate_chance
+	ctx.zone_parent_inverse_orientation_chance = zone_parent_inverse_orientation_chance
 
 	ctx.room_amount = room_amount
 	ctx.room_min_squared_ratio = room_min_squared_ratio
