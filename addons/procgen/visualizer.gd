@@ -38,12 +38,12 @@ func _draw() -> void:
 		return
 	for leaf in generator._generator.bsp.get_leaves():
 		draw_rect(leaf.rect, zone_rect_color, false, 1)
-		#draw_rect(leaf.room_rect, room_rect_color, true)
-		#for adj in leaf.adjacents:
-			#draw_circle(leaf.room_rect.get_center(), 1, zone_adjacent_color)
-			#draw_circle(adj.room_rect.get_center(), 1, zone_adjacent_color)
-			#draw_line(
-				#leaf.room_rect.get_center(),
-				#adj.room_rect.get_center(),
-				#zone_adjacent_color, 1
-			#)
+		draw_rect(leaf.room_rect, room_rect_color, true)
+		for adj in leaf.adjacents:
+			draw_circle(leaf.room_rect.get_center(), 1, zone_adjacent_color)
+			draw_circle(adj.room_rect.get_center(), 1, zone_adjacent_color)
+			draw_line(
+				leaf.room_rect.get_center(),
+				adj.room_rect.get_center(),
+				zone_adjacent_color, 1
+			)

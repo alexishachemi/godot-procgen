@@ -42,25 +42,34 @@ const Context = preload("generator/context.gd")
 ## The amount of rooms that will be generated.
 @export_range(1, 1, 1, "or_greater") var room_amount: int
 
-## The maximum ratio of a room's width to its height. [br]
-## [code]1.0[/code] -> Width and height are always the same (square rooms) [br]
-## [code]2.0[/code] -> Width can be up to 2x bigger/smaller than height
-@export_range(1.0, 2.0) var room_max_ratio: float
+## The ratio of how squared rooms are. Note that this can impact the 
+## target coverage of rooms. [br]
+## [code]0.0[/code] -> No limits on the width to height ratio. [br]
+## [code]1.0[/code] -> Width and height are always the same (square rooms)
+@export_range(0.0, 1.0) var room_min_squared_ratio: float = 0.3:
+	set(value): room_min_squared_ratio = min(value, room_max_squared_ratio)
+
+## The ratio of how squared rooms are. Note that this can impact the 
+## target coverage of rooms. [br]
+## [code]0.0[/code] -> No limits on the width to height ratio. [br]
+## [code]1.0[/code] -> Width and height are always the same (square rooms)
+@export_range(0.0, 1.0) var room_max_squared_ratio: float = 1.0:
+	set(value): room_max_squared_ratio = max(value, room_min_squared_ratio)
 
 ## The minimum coverage of a room. Coverage is how much of the zone the
 ## room occupies.
-@export_range(0.01, 1.0, 0.01) var room_min_coverage: float:
+@export_range(0.01, 1.0, 0.01) var room_min_coverage: float = 0.1:
 	set(value): room_min_coverage = min(value, room_max_coverage)
 
 ## The maximum coverage of a room. Coverage is how much of the zone the
 ## room occupies.
-@export_range(0.01, 1.0, 0.01) var room_max_coverage: float:
+@export_range(0.01, 1.0, 0.01) var room_max_coverage: float = 0.3:
 	set(value): room_max_coverage = max(value, room_min_coverage)
 
 ## How centered is a room inside its zone. [br]
 ## [code]0.0[/code] -> Rooms can be anywhere inside their zone. [br]
 ## [code]1.0[/code] -> Rooms are always at the center of their zone.
-@export_range(0.0, 1.0, 0.01) var room_center_ratio: float
+@export_range(0.0, 1.0, 0.01) var room_center_ratio: float = 0.5
 
 @export_group("Corridors", "corridor")
 
@@ -107,7 +116,8 @@ var _generator := preload("generator/generator.gd").new()
 
 func _ready() -> void:
 	_generator.finished.connect(finished.emit)
-	generate()
+	if not Engine.is_editor_hint():
+		generate()
 
 func generate():
 	var ctx := Context.new()
@@ -118,7 +128,8 @@ func generate():
 	ctx.zone_orientation_alternate_chance = zone_orientation_alternate_chance
 
 	ctx.room_amount = room_amount
-	ctx.room_max_ratio = room_max_ratio
+	ctx.room_min_squared_ratio = room_min_squared_ratio
+	ctx.room_max_squared_ratio = room_max_squared_ratio
 	ctx.room_min_coverage = room_min_coverage
 	ctx.room_max_coverage = room_max_coverage
 	ctx.room_center_ratio = room_center_ratio

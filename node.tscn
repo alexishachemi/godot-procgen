@@ -5,12 +5,10 @@
 
 [node name="Node" type="Node"]
 script = ExtResource("1_sy5k4")
-map_size = Vector2i(100, 100)
-seed = 3730832810
-room_amount = 7
-room_min_coverage = null
-room_max_coverage = null
-room_center_ratio = 0.8
+seed = 4086390388
+zone_split_max_ratio = 0.7
+room_amount = 8
+room_min_squared_ratio = 0.2
 corridor_edge_overlap_min_ratio = 0.5
 
 [node name="Node2D" type="Node2D" parent="." node_paths=PackedStringArray("generator")]

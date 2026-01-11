@@ -93,39 +93,6 @@ func generate_internal_data():
 	generate_frontiers()
 	match_adjacents()
 
-func generate_room():
-	var room_size: Vector2i
-	var rect_area := rect.get_area()
-	var room_area := ctx.rng.randi_range(
-		rect_area * ctx.room_min_coverage_ratio,
-		rect_area * ctx.room_max_coverage_ratio
-	)
-	var size_ratio: float = randf_range(1.0, ctx.room_max_ratio)
-	var height: int = int(round(sqrt(room_area / size_ratio)))
-	var width: int = int(round(height * size_ratio))
-	if ctx.rng.randi() % 2:
-		var tmp := width
-		width = height
-		height = tmp
-	if width > rect.size.x:
-		height += width - rect.size.x
-	if height > rect.size.y:
-		width += height - rect.size.y
-	if width * height < room_area:
-		if width < height * size_ratio:
-			width += 1
-		else:
-			height += 1
-	room_size = Vector2i(width, height).min(rect.size)
-	var margins := (rect.size - room_size) / 2
-	var offset := Vector2i(
-		ctx.rng.randi_range(0, margins.x * ctx.room_center_ratio),
-		ctx.rng.randi_range(0, margins.y * ctx.room_center_ratio)
-	)
-	if ctx.rng.randi() % 2:
-		offset *= -1
-	room_rect = Rect2i(rect.position + margins + offset, room_size)
-
 func generate_frontiers():
 	if is_leaf():
 		north_frontiers = [self]
@@ -180,6 +147,52 @@ func _edges_overlap(r1: Rect2i, r2: Rect2i) -> bool:
 		return overlap > 30
 		return max(overlap, 0) >= min(y1, y2) * ctx.corridor_edge_overlap_min_ratio
 	return 0
+
+#endregion #####################################################################
+
+#region Room ###################################################################
+
+func generate_room():
+	var area := _compute_room_area()
+	var size := _compute_size(area)
+	var pos := _compute_position(size)
+	room_rect = Rect2i(pos, size)
+
+
+func _compute_room_area() -> int:
+	var outer_area: int = rect.get_area()
+	var min_area: int = max(1, outer_area * ctx.room_min_coverage)
+	var max_area: int = min(outer_area, outer_area * ctx.room_max_coverage)
+	return ctx.rng.randi_range(min_area, max_area)
+
+
+func _compute_size(area: int) -> Vector2i:
+	var smallest_size: float = min(rect.size.x, rect.size.y)
+	var biggest_size: float = max(rect.size.x, rect.size.y)
+	var max_ratio: float = smallest_size / biggest_size
+	var squared_ratio: float = ctx.rng.randf_range(
+		ctx.room_min_squared_ratio, ctx.room_max_squared_ratio
+	)
+	var ratio: float = lerp(max_ratio, 1.0, squared_ratio)
+	var base_size: int = max(1, sqrt(area))
+	var size := Vector2i(max(1, base_size / ratio), max(1, base_size * ratio))
+	var width_is_smallest: bool = smallest_size == rect.size.x
+	if width_is_smallest:
+		size = Vector2i(size.y, size.x)
+	return size.min(rect.size)
+
+
+func _compute_position(size: Vector2i) -> Vector2i:
+	var max_margin: Vector2i = (rect.size - size).maxi(0)
+	var center_margin := max_margin / 2
+	var min_margin := _lerp_v2i(Vector2i.ZERO, center_margin, ctx.room_center_ratio)
+	max_margin = _lerp_v2i(max_margin, center_margin, ctx.room_center_ratio)
+	var x: int = ctx.rng.randi_range(min_margin.x, max_margin.x)
+	var y: int = ctx.rng.randi_range(min_margin.y, max_margin.y)
+	return rect.position + Vector2i(x, y)
+
+func _lerp_v2i(from: Vector2i, to: Vector2i, weigth: float) -> Vector2i:
+	return Vector2i(lerp(from.x, to.x, weigth), lerp(from.y, to.y, weigth))
 
 #endregion #####################################################################
 
