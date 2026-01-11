@@ -23,6 +23,8 @@ var parent: BSP = null
 var sub1: BSP = null
 var sub2: BSP = null
 
+var graph: Graph = null
+
 func _init(ctx: Context) -> void:
 	self.ctx = ctx
 	rect = Rect2i(0, 0, ctx.map_size.x, ctx.map_size.y)
@@ -30,7 +32,7 @@ func _init(ctx: Context) -> void:
 func generate():
 	split_recursive()
 	generate_internal_data()
-	var graph := Graph.new()
+	graph = Graph.new(ctx)
 	graph.generate(self)
 
 func generate_internal_data():
@@ -89,7 +91,6 @@ static func alternate_split_orientation(orientation: SplitOrientation) -> SplitO
 #region Split ##################################################################
 
 func split_recursive():
-	print()
 	var orient: SplitOrientation
 	var leaf: BSP
 	for i in range(ctx.room_amount - 1):
@@ -254,13 +255,69 @@ func _get_biggest_overlap_ratio(r1: Rect2i, r2: Rect2i) -> float:
 
 class Graph:
 
+	var ctx: Context
+	var groups: Array[Group]
+	var discarded_links: Array[Array]
+	var final_links: Array[Array]
+
+	func _init(context: Context) -> void:
+		ctx = context
+
 	func generate(bsp: BSP):
-		var nav := Nav.new()
-		nav.traverse(bsp)
+		var links := Nav.find_links(bsp, ctx.rng)
+		var g1: Group
+		var g2: Group
+		for link: Array[BSP] in links:
+			g1 = get_group(link[0])
+			g2 = get_group(link[1])
+			if not g1 and not g2:
+				add_group().add(link)
+			elif g1 and g2 and g1 != g2:
+				g1.merge(g2)
+				groups.erase(g2)
+				g1.add(link)
+			elif g1 and not g2:
+				g1.add(link)
+			elif not g1 and g2:
+				g2.add(link)
+			else:
+				discarded_links.append(link)
+		for group in groups:
+			final_links.append_array(group.links)
+
+	func add_group() -> Group:
+		var new_group := Group.new()
+		groups.append(new_group)
+		return new_group
+
+	func get_group(bsp: BSP) -> Group:
+		for group in groups:
+			if group.has_member(bsp):
+				return group
+		return null
+
+	class Group:
+		var members: Array[BSP]
+		var links: Array[Array]
+		
+		func has_member(bsp: BSP) -> bool:
+			return members.has(bsp)
+		
+		func add(link: Array):
+			links.append(link)
+			members.append_array(link)
+		
+		func merge(other: Group):
+			members.append_array(other.members)
+			links.append_array(other.links)
 
 	class Nav:
 		var visited: Array[BSP]
 		var links: Array[Array]
+		var rng: RandomNumberGenerator
+		
+		func _init(rng: RandomNumberGenerator) -> void:
+			self.rng = rng
 		
 		func traverse(bsp: BSP):
 			if not bsp.is_leaf():
@@ -277,9 +334,24 @@ class Graph:
 			if links.find_custom(_link_has_members.bind(b1, b2)) == -1:
 				links.append([b1, b2])
 		
+		func shuffle_links():
+			var j: int
+			var tmp: Array
+			for i in links.size() - 2:
+				j = rng.randi_range(i, links.size() - 1)
+				tmp = links[i]
+				links[i] = links[j]
+				links[j] = tmp
+		
 		static func _link_has_members(link: Array, m1: BSP, m2: BSP) -> bool:
 			return (link[0] == m1 and link[1] == m2) \
 				or (link[1] == m1 and link[0] == m2)
+		
+		static func find_links(bsp: BSP, rng: RandomNumberGenerator) -> Array[Array]:
+			var nav := Nav.new(rng)
+			nav.traverse(bsp)
+			nav.shuffle_links()
+			return nav.links
 
 
 #endregion #####################################################################
