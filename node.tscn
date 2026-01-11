@@ -6,9 +6,10 @@
 [node name="Node" type="Node"]
 script = ExtResource("1_sy5k4")
 map_size = Vector2i(100, 100)
-seed = 847678588
+generate_new_seed_on_run = false
+seed = 2280287792
+zone_parent_inverse_orientation_chance = 1.0
 room_amount = 10
-corridor_edge_overlap_min_ratio = 0.5
 
 [node name="Node2D" type="Node2D" parent="." node_paths=PackedStringArray("generator")]
 script = ExtResource("2_j2q8x")

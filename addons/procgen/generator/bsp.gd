@@ -23,13 +23,23 @@ var parent: BSP = null
 var sub1: BSP = null
 var sub2: BSP = null
 
-func generate():
-	split_recursive()
-	generate_internal_data()
-
 func _init(ctx: Context) -> void:
 	self.ctx = ctx
 	rect = Rect2i(0, 0, ctx.map_size.x, ctx.map_size.y)
+
+func generate():
+	split_recursive()
+	generate_internal_data()
+	print()
+
+func generate_internal_data():
+	if is_leaf():
+		generate_room()
+	else:
+		sub1.generate_internal_data()
+		sub2.generate_internal_data()
+	generate_frontiers()
+	match_adjacents()
 
 #region Split ##################################################################
 
@@ -83,74 +93,6 @@ func get_shallowest_leaf(shallowest: BSP = null) -> BSP:
 
 #endregion #####################################################################
 
-#region Internal Data ##########################################################
-
-func generate_internal_data():
-	if is_leaf():
-		generate_room()
-	else:
-		sub1.generate_internal_data()
-		sub2.generate_internal_data()
-	generate_frontiers()
-	match_adjacents()
-
-func generate_frontiers():
-	if is_leaf():
-		north_frontiers = [self]
-		south_frontiers = [self]
-		west_frontiers = [self]
-		east_frontiers = [self]
-	elif split_orientation == SplitOrientation.HORIZONTAL:
-		north_frontiers = sub1.north_frontiers
-		south_frontiers = sub2.south_frontiers
-		west_frontiers = sub1.west_frontiers + sub2.west_frontiers
-		east_frontiers = sub1.east_frontiers + sub2.east_frontiers
-	else:
-		north_frontiers = sub1.north_frontiers + sub2.north_frontiers
-		south_frontiers = sub1.south_frontiers + sub2.south_frontiers
-		west_frontiers = sub1.west_frontiers
-		east_frontiers = sub2.east_frontiers
-
-func match_adjacents():
-	if is_leaf():
-		return
-	var frontiers_1: Array[BSP]
-	var frontiers_2: Array[BSP]
-	if split_orientation == SplitOrientation.HORIZONTAL:
-		frontiers_1 = sub1.south_frontiers
-		frontiers_2 = sub2.north_frontiers
-	else:
-		frontiers_1 = sub1.east_frontiers
-		frontiers_2 = sub2.west_frontiers
-	for b1 in frontiers_1:
-		for b2 in frontiers_2:
-			if _edges_overlap(b1.rect, b2.rect):
-				b1.adjacents.append(b2)
-				b2.adjacents.append(b1)
-
-func _edges_overlap(r1: Rect2i, r2: Rect2i) -> bool:
-	var x1: int = r1.position.x
-	var y1: int = r1.position.y
-	var w1: int = r1.size.x
-	var h1: int = r1.size.y
-	var x2: int = r2.position.x
-	var y2: int = r2.position.y
-	var w2: int = r2.size.x
-	var h2: int = r2.size.y
-	var overlap: int = 0
-
-	if x1 + w1 == x2 or x2 + w2 == x1:
-		overlap = min(y1 + h1, y2 + h2) - max(y1, y2)
-		return overlap > 30
-		return max(overlap, 0) >= min(x1, x2) * ctx.corridor_edge_overlap_min_ratio
-	elif y1 + h1 == y2 or y2 + h2 == y1:
-		overlap = min(x1 + w1, x2 + w2) - max(x1, x2)
-		return overlap > 30
-		return max(overlap, 0) >= min(y1, y2) * ctx.corridor_edge_overlap_min_ratio
-	return 0
-
-#endregion #####################################################################
-
 #region Room ###################################################################
 
 func generate_room():
@@ -194,6 +136,74 @@ func _compute_position(size: Vector2i) -> Vector2i:
 
 func _lerp_v2i(from: Vector2i, to: Vector2i, weigth: float) -> Vector2i:
 	return Vector2i(lerp(from.x, to.x, weigth), lerp(from.y, to.y, weigth))
+
+#endregion #####################################################################
+
+#region Adjacents ##############################################################
+
+func generate_frontiers():
+	if is_leaf():
+		north_frontiers = [self]
+		south_frontiers = [self]
+		west_frontiers = [self]
+		east_frontiers = [self]
+	elif split_orientation == SplitOrientation.HORIZONTAL:
+		north_frontiers = sub1.north_frontiers
+		south_frontiers = sub2.south_frontiers
+		west_frontiers = sub1.west_frontiers + sub2.west_frontiers
+		east_frontiers = sub1.east_frontiers + sub2.east_frontiers
+	else:
+		north_frontiers = sub1.north_frontiers + sub2.north_frontiers
+		south_frontiers = sub1.south_frontiers + sub2.south_frontiers
+		west_frontiers = sub1.west_frontiers
+		east_frontiers = sub2.east_frontiers
+
+func match_adjacents():
+	if is_leaf():
+		return
+	var frontiers_1: Array[BSP]
+	var frontiers_2: Array[BSP]
+	if split_orientation == SplitOrientation.HORIZONTAL:
+		frontiers_1 = sub1.south_frontiers
+		frontiers_2 = sub2.north_frontiers
+	else:
+		frontiers_1 = sub1.east_frontiers
+		frontiers_2 = sub2.west_frontiers
+	for b1 in frontiers_1:
+		for b2 in frontiers_2:
+			if _get_biggest_overlap_ratio(b1.rect, b2.rect) >= ctx.corridor_edge_overlap_min_ratio:
+				_make_adjacent(b1, b2)
+
+func _make_adjacent(b1: BSP, b2: BSP):
+	if not b1.adjacents.has(b2):
+		b1.adjacents.append(b2)
+	if not b2.adjacents.has(b1):
+		b2.adjacents.append(b1)
+
+func _get_biggest_overlap_ratio(r1: Rect2i, r2: Rect2i) -> float:
+	var s1: Vector2i
+	var s2: Vector2i
+	var is_vertical: bool = r1.end.x == r2.position.x or r2.end.x == r1.position.x
+	if is_vertical:
+		s1 = Vector2i(r1.position.y, r1.end.y)
+		s2 = Vector2i(r2.position.y, r2.end.y)
+	else:
+		s1 = Vector2i(r1.position.x, r1.end.x)
+		s2 = Vector2i(r2.position.x, r2.end.x)
+
+	var start := maxi(mini(s1.x, s1.y), mini(s2.x, s2.y))
+	var end := mini(maxi(s1.x, s1.y), maxi(s2.x, s2.y))
+	var overlap: float = maxf(0.0, float(end - start))
+
+	var denom1 := float(r1.size.y if is_vertical else r1.size.x)
+	var denom2 := float(r2.size.y if is_vertical else r2.size.x)
+	if denom1 <= 0.0 or denom2 <= 0.0:
+		return 0.0
+
+	var val := maxf(overlap / denom1, overlap / denom2)
+	print("%s %s %s %s" % [overlap, denom1, denom2, val])
+	return val
+
 
 #endregion #####################################################################
 
