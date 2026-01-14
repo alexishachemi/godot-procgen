@@ -1,6 +1,7 @@
 extends Node
 
 signal finished
+signal automaton_iteration_finished
 
 const Context = preload("context.gd")
 const BSP = preload("bsp.gd")
@@ -8,27 +9,24 @@ const Automaton = preload("automaton.gd")
 const Router = preload("router.gd")
 
 var ctx: Context
-var bsp: BSP
-var router: Router
-var automaton: Automaton
-var corridor_segments: Array[Array]
+var bsp: BSP = BSP.new()
+var router: Router = Router.new()
+var automaton: Automaton = Automaton.new()
 var generating: bool = false
+
+
+func _init():
+	automaton.iteration_finished.connect(automaton_iteration_finished.emit)
+	automaton.finished.connect(_on_automaton_finished)
+
 
 func generate(ctx: Context):
 	generating = true
 	self.ctx = ctx
-	bsp = BSP.new(ctx)
-	bsp.generate()
-	router = Router.new(ctx)
-	router.route_all_rooms(bsp)
-	if ctx.automaton_iterations:
-		automaton = Automaton.new(ctx)
-		automaton.finished.connect(_on_automaton_finished, CONNECT_ONE_SHOT)
-		automaton.generate()
-	else:
-		automaton = null
-		finished.emit()
-		generating = false
+	bsp.generate(ctx)
+	router.generate(ctx, bsp)
+	automaton.generate(ctx, bsp, router)
+
 
 func _on_automaton_finished():
 	finished.emit()

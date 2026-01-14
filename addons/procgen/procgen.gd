@@ -1,13 +1,16 @@
 @tool
-class_name ProcGen extends Node
+class_name ProcGen
+extends Node
 
 signal finished
+signal automaton_iteration_finished
 
 const Context = preload("generator/context.gd")
 
 @export_tool_button("Generate") var _generate_callback = generate
 @export var map_size: Vector2i = Vector2i(300, 300):
-	set(value): map_size = Vector2i.ONE.max(value)
+	set(value):
+		map_size = Vector2i.ONE.max(value)
 
 ## Generates a new seed and writes it to [member ProcGen.seed] before running
 ## a generation.
@@ -47,24 +50,28 @@ const Context = preload("generator/context.gd")
 ## [code]0.0[/code] -> No limits on the width to height ratio. [br]
 ## [code]1.0[/code] -> Width and height are always the same (square rooms)
 @export_range(0.0, 1.0) var room_min_squared_ratio: float = 0.3:
-	set(value): room_min_squared_ratio = min(value, room_max_squared_ratio)
+	set(value):
+		room_min_squared_ratio = min(value, room_max_squared_ratio)
 
 ## The ratio of how squared rooms are. Note that this can impact the
 ## target coverage of rooms. [br]
 ## [code]0.0[/code] -> No limits on the width to height ratio. [br]
 ## [code]1.0[/code] -> Width and height are always the same (square rooms)
 @export_range(0.0, 1.0) var room_max_squared_ratio: float = 1.0:
-	set(value): room_max_squared_ratio = max(value, room_min_squared_ratio)
+	set(value):
+		room_max_squared_ratio = max(value, room_min_squared_ratio)
 
 ## The minimum coverage of a room. Coverage is how much of the zone the
 ## room occupies.
 @export_range(0.01, 1.0, 0.01) var room_min_coverage: float = 0.1:
-	set(value): room_min_coverage = min(value, room_max_coverage)
+	set(value):
+		room_min_coverage = min(value, room_max_coverage)
 
 ## The maximum coverage of a room. Coverage is how much of the zone the
 ## room occupies.
 @export_range(0.01, 1.0, 0.01) var room_max_coverage: float = 0.3:
-	set(value): room_max_coverage = max(value, room_min_coverage)
+	set(value):
+		room_max_coverage = max(value, room_min_coverage)
 
 ## How centered is a room inside its zone. [br]
 ## [code]0.0[/code] -> Rooms can be anywhere inside their zone. [br]
@@ -103,13 +110,15 @@ const Context = preload("generator/context.gd")
 ## also be full. (i.e. given a cell at a given position,
 ## how many surrounding cells needs to be full for it to be full as well)
 @export_range(0, 8) var automaton_cell_min_neighbors: int = 5:
-	set(value): automaton_cell_min_neighbors = min(value, automaton_cell_max_neighbors)
+	set(value):
+		automaton_cell_min_neighbors = min(value, automaton_cell_max_neighbors)
 
 ## The maximum number of neighboring cells set to full for the current cell to
 ## also be full. (i.e. given a cell at a given position,
 ## how many surrounding cells needs to be full for it to be empty)
 @export_range(0, 8) var automaton_cell_max_neighbors: int = 8:
-	set(value): automaton_cell_max_neighbors = max(value, automaton_cell_min_neighbors)
+	set(value):
+		automaton_cell_max_neighbors = max(value, automaton_cell_min_neighbors)
 
 ## The chance that a cell will be full at the initial state of the automaton.
 ## [code]0.0[/code] -> every cell is empty. [br]
@@ -137,10 +146,13 @@ const Context = preload("generator/context.gd")
 
 var _generator := preload("generator/generator.gd").new()
 
+
 func _ready() -> void:
 	_generator.finished.connect(finished.emit)
+	_generator.automaton_iteration_finished.connect(automaton_iteration_finished.emit)
 	if not Engine.is_editor_hint():
 		generate()
+
 
 ## Runs a generation using the provided settings. [br]
 ## TODO
@@ -193,19 +205,18 @@ func is_full_at(at: Vector2i) -> bool:
 func get_rooms() -> Array[Rect2i]:
 	return _generator.bsp.get_all_rooms() if _generator.bsp else []
 
-
 ## Returns corridor
 ## The area of those rectangles is [i]guaranteed[/i] to be empty space. [br]
 ## Returns an empty array if called before calling [method ProcGen.generate].
 #func get_corridor_segments() -> Array[Array]:
-	#if not _generator.bsp:
-		#return []
-	#var rooms: Array[Rect2i]
-	#rooms.resize(room_amount)
-	#var leaves := _generator.bsp.get_leaves()
-	#for i in range(room_amount):
-		#rooms[i] = leaves[i].room_rect
-	#return rooms
+#if not _generator.bsp:
+#return []
+#var rooms: Array[Rect2i]
+#rooms.resize(room_amount)
+#var leaves := _generator.bsp.get_leaves()
+#for i in range(room_amount):
+#rooms[i] = leaves[i].room_rect
+#return rooms
 
 
 ## Returns [code]true[/code] if the generator is currently active.

@@ -3,37 +3,83 @@ extends RefCounted
 enum State { ON, OFF, FIXED_ON, FIXED_OFF }
 
 signal finished
+signal iteration_finished
 signal _region_compute_step_finished
 signal _region_compute_finished
 
 const Context = preload("context.gd")
+const BSP = preload("bsp.gd")
+const Router = preload("router.gd")
 
 var ctx: Context
 var front_matrix: Array[Array]
 var back_matrix: Array[Array]
 var threads: Array[Array]
+var initialized: bool = false
 
 var _region_computed: int
 
-func _init(context: Context) -> void:
+
+func _init() -> void:
 	_region_compute_step_finished.connect(_on_region_compute_step_finished)
+
+
+func generate(context: Context, bsp: BSP, router: Router):
 	ctx = context
+	initialized = true
 	front_matrix.resize(ctx.map_size.y)
 	for line in front_matrix:
 		line.resize(ctx.map_size.x)
 		line.fill(State.OFF)
-
-
-func generate():
 	if ctx.automaton_iterations <= 0:
 		finished.emit()
 		return
+	add_fixed(bsp, router)
 	pre_fill()
-	back_matrix = front_matrix.duplicate_deep()
-	init_threads()
-	for i in range(ctx.automaton_iterations):
-		await iterate()
+	if ctx.automaton_iterations:
+		back_matrix = front_matrix.duplicate_deep()
+		init_threads()
+		for i in range(ctx.automaton_iterations):
+			await iterate()
+			iteration_finished.emit()
 	finished.emit()
+
+
+func add_fixed(bsp: BSP, router: Router):
+	var leaves := bsp.get_leaves()
+	#for leaf in leaves:
+	#set_rect_outline_fixed(leaf.rect)
+	#for point in router.points:
+	#set_front_point(point, State.FIXED_OFF, ctx.corridor_width_expand)
+	for leaf in leaves:
+		fill_front_region(leaf.room_rect, State.FIXED_OFF)
+
+
+func set_rect_outline_fixed(rect: Rect2i):
+	for x in range(rect.position.x, rect.end.x):
+		set_front_point(
+			Vector2i(x, rect.position.y),
+			State.FIXED_ON,
+			ctx.automaton_zones_outline_expand,
+		)
+	for x in range(rect.position.x, rect.end.x):
+		set_front_point(
+			Vector2i(x, rect.end.y - 1),
+			State.FIXED_ON,
+			ctx.automaton_zones_outline_expand,
+		)
+	for y in range(rect.position.y, rect.end.y):
+		set_front_point(
+			Vector2i(rect.position.x, y),
+			State.FIXED_ON,
+			ctx.automaton_zones_outline_expand,
+		)
+	for y in range(rect.position.y, rect.end.y):
+		set_front_point(
+			Vector2i(rect.end.x - 1, y),
+			State.FIXED_ON,
+			ctx.automaton_zones_outline_expand,
+		)
 
 
 func pre_fill():
@@ -78,6 +124,19 @@ func get_front_cell(x: int, y: int) -> State:
 func set_front_cell(x: int, y: int, state: State):
 	if x >= 0 and x < ctx.map_size.x and y >= 0 and y < ctx.map_size.y:
 		front_matrix[y][x] = state
+
+
+func fill_front_region(region: Rect2i, state: State):
+	for x in range(region.position.x, region.end.x):
+		for y in range(region.position.y, region.end.y):
+			set_front_cell(x, y, state)
+
+
+func set_front_point(at: Vector2i, state: State, expand: int = 0):
+	fill_front_region(
+		Rect2i(at.x - expand, at.y - expand, at.x + expand + 1, at.y + expand + 1),
+		state,
+	)
 
 
 func get_back_cell(x: int, y: int) -> State:
@@ -153,8 +212,9 @@ func init_threads():
 		threads[i] = [
 			Thread.new(),
 			compute_region.bind(rects[i]),
-			update_back_matrix_region.bind(rects[i])
+			update_back_matrix_region.bind(rects[i]),
 		]
+
 
 func get_sub_rects(n: int) -> Array[Rect2i]:
 	var r := Rect2i(0, 0, ctx.map_size.x, ctx.map_size.y)
@@ -190,7 +250,7 @@ func get_sub_rects(n: int) -> Array[Rect2i]:
 			rects.append(b)
 		elif size.y > 1:
 			var a_h := size.y / 2
-			var b_h := size.y - a_h  # remainder goes here
+			var b_h := size.y - a_h # remainder goes here
 			var a := Rect2i(pos, Vector2i(size.x, a_h))
 			var b := Rect2i(pos + Vector2i(0, a_h), Vector2i(size.x, b_h))
 			rects.append(a)

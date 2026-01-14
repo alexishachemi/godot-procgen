@@ -25,15 +25,16 @@ var sub2: BSP = null
 
 var graph: Graph = null
 
-func _init(ctx: Context) -> void:
-	self.ctx = ctx
-	rect = Rect2i(0, 0, ctx.map_size.x, ctx.map_size.y)
 
-func generate():
+func generate(context: Context):
+	clear()
+	ctx = context
+	rect = Rect2i(0, 0, ctx.map_size.x, ctx.map_size.y)
 	split_recursive()
 	generate_internal_data()
 	graph = Graph.new(ctx)
 	graph.generate(self)
+
 
 func generate_internal_data():
 	if is_leaf():
@@ -44,42 +45,68 @@ func generate_internal_data():
 	generate_frontiers()
 	match_adjacents()
 
+
+func clear():
+	depth = 0
+	north_frontiers = []
+	south_frontiers = []
+	west_frontiers = []
+	east_frontiers = []
+	adjacents = []
+	group = []
+	parent = null
+	sub1 = null
+	sub2 = null
+	graph = null
+
 #region Utils ##################################################################
 
 func create_child(rect: Rect2i) -> BSP:
-	var child := BSP.new(ctx)
+	var child := BSP.new()
+	child.ctx = ctx
 	child.depth = depth + 1
 	child.rect = rect
 	child.parent = self
 	return child
 
+
 func is_leaf() -> bool:
 	return sub1 == null
+
 
 func get_leaves() -> Array[BSP]:
 	if is_leaf():
 		return [self]
 	return sub1.get_leaves() + sub2.get_leaves()
 
+
 func print_tree():
 	print_rich(_get_tree_string())
 
+
 func _get_tree_string(indent: String = "") -> String:
 	var str: String = "[rect: %s; room: %s; depth: %s; split: %s]" % [
-		rect, room_rect, depth, get_split_orientation_str(split_orientation)
+		rect,
+		room_rect,
+		depth,
+		get_split_orientation_str(split_orientation),
 	]
 	if is_leaf():
 		str = "[color=light_green]%s[/color]" % str
 	else:
 		str += "\n" + indent + "├──" + sub1._get_tree_string(indent + "│  ")
-		str += "\n" + indent + "└──" +sub2._get_tree_string(indent + "   ")
+		str += "\n" + indent + "└──" + sub2._get_tree_string(indent + "   ")
 	return str
+
 
 static func get_split_orientation_str(orientation: SplitOrientation) -> String:
 	match orientation:
-		SplitOrientation.HORIZONTAL: return "H"
-		SplitOrientation.VERTICAL: return "V"
+		SplitOrientation.HORIZONTAL:
+			return "H"
+		SplitOrientation.VERTICAL:
+			return "V"
 	return "U"
+
 
 static func alternate_split_orientation(orientation: SplitOrientation) -> SplitOrientation:
 	if orientation == SplitOrientation.HORIZONTAL:
@@ -103,6 +130,7 @@ func split_recursive():
 			orient = leaf.parent.split_orientation
 		leaf.split(orient)
 
+
 func split(orientation: SplitOrientation):
 	split_orientation = orientation
 	var rect1: Rect2i
@@ -123,6 +151,7 @@ func split(orientation: SplitOrientation):
 		rect2 = Rect2i(rect.position.x + n, rect.position.y, rect.size.x - rect1.size.x, rect.size.y)
 	sub1 = create_child(rect1)
 	sub2 = create_child(rect2)
+
 
 func get_shallowest_leaf(shallowest: BSP = null) -> BSP:
 	if is_leaf():
@@ -148,6 +177,7 @@ func get_all_rooms() -> Array[Rect2i]:
 	for i in range(ctx.room_amount):
 		rooms[i] = leaves[i].room_rect
 	return rooms
+
 
 func generate_room():
 	var area := _compute_room_area()
@@ -175,7 +205,8 @@ func _compute_size(area: int) -> Vector2i:
 	var biggest_size: float = max(rect.size.x, rect.size.y)
 	var max_ratio: float = smallest_size / biggest_size
 	var squared_ratio: float = ctx.rng.randf_range(
-		ctx.room_min_squared_ratio, ctx.room_max_squared_ratio
+		ctx.room_min_squared_ratio,
+		ctx.room_max_squared_ratio,
 	)
 	var ratio: float = lerp(max_ratio, 1.0, squared_ratio)
 	var base_size: int = max(1, sqrt(area))
@@ -194,6 +225,7 @@ func _compute_position(size: Vector2i) -> Vector2i:
 	var x: int = ctx.rng.randi_range(min_margin.x, max_margin.x)
 	var y: int = ctx.rng.randi_range(min_margin.y, max_margin.y)
 	return rect.position + Vector2i(x, y)
+
 
 func _lerp_v2i(from: Vector2i, to: Vector2i, weigth: float) -> Vector2i:
 	return Vector2i(lerp(from.x, to.x, weigth), lerp(from.y, to.y, weigth))
@@ -219,6 +251,7 @@ func generate_frontiers():
 		west_frontiers = sub1.west_frontiers
 		east_frontiers = sub2.east_frontiers
 
+
 func match_adjacents():
 	if is_leaf():
 		return
@@ -235,11 +268,13 @@ func match_adjacents():
 			if _get_biggest_overlap_ratio(b1.rect, b2.rect) >= ctx.corridor_edge_overlap_min_ratio:
 				_make_adjacent(b1, b2)
 
+
 func _make_adjacent(b1: BSP, b2: BSP):
 	if not b1.adjacents.has(b2):
 		b1.adjacents.append(b2)
 	if not b2.adjacents.has(b1):
 		b2.adjacents.append(b1)
+
 
 func _get_biggest_overlap_ratio(r1: Rect2i, r2: Rect2i) -> float:
 	var s1: Vector2i
@@ -263,20 +298,20 @@ func _get_biggest_overlap_ratio(r1: Rect2i, r2: Rect2i) -> float:
 
 	return maxf(overlap / denom1, overlap / denom2)
 
-
 #endregion #####################################################################
 
 #region Graph ##################################################################
 
 class Graph:
-
 	var ctx: Context
 	var groups: Array[Group]
 	var discarded_links: Array[Array]
 	var final_links: Array[Array]
 
+
 	func _init(context: Context) -> void:
 		ctx = context
+
 
 	func generate(bsp: BSP):
 		var links := Nav.find_links(bsp, ctx.rng)
@@ -303,10 +338,12 @@ class Graph:
 		for group in groups:
 			final_links.append_array(group.links)
 
+
 	func add_group() -> Group:
 		var new_group := Group.new()
 		groups.append(new_group)
 		return new_group
+
 
 	func get_group(bsp: BSP) -> Group:
 		for group in groups:
@@ -314,29 +351,36 @@ class Graph:
 				return group
 		return null
 
+
 	class Group:
 		var members: Array[BSP]
 		var links: Array[Array]
-		
+
+
 		func has_member(bsp: BSP) -> bool:
 			return members.has(bsp)
-		
+
+
 		func add(link: Array):
 			links.append(link)
 			members.append_array(link)
-		
+
+
 		func merge(other: Group):
 			members.append_array(other.members)
 			links.append_array(other.links)
+
 
 	class Nav:
 		var visited: Array[BSP]
 		var links: Array[Array]
 		var rng: RandomNumberGenerator
-		
+
+
 		func _init(rng: RandomNumberGenerator) -> void:
 			self.rng = rng
-		
+
+
 		func traverse(bsp: BSP):
 			if not bsp.is_leaf():
 				traverse(bsp.sub1)
@@ -347,11 +391,13 @@ class Graph:
 			visited.append(bsp)
 			for adjacent in bsp.adjacents:
 				add_link(bsp, adjacent)
-		
+
+
 		func add_link(b1: BSP, b2: BSP):
 			if links.find_custom(_link_has_members.bind(b1, b2)) == -1:
 				links.append([b1, b2])
-		
+
+
 		func shuffle_links():
 			var j: int
 			var tmp: Array
@@ -360,16 +406,17 @@ class Graph:
 				tmp = links[i]
 				links[i] = links[j]
 				links[j] = tmp
-		
+
+
 		static func _link_has_members(link: Array, m1: BSP, m2: BSP) -> bool:
 			return (link[0] == m1 and link[1] == m2) \
-				or (link[1] == m1 and link[0] == m2)
-		
+			or (link[1] == m1 and link[0] == m2)
+
+
 		static func find_links(bsp: BSP, rng: RandomNumberGenerator) -> Array[Array]:
 			var nav := Nav.new(rng)
 			nav.traverse(bsp)
 			nav.shuffle_links()
 			return nav.links
-
 
 #endregion #####################################################################

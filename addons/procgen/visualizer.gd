@@ -1,15 +1,18 @@
 @tool
-class_name ProcGenVisualizer extends Sprite2D
+class_name ProcGenVisualizer
+extends Sprite2D
+
+const Automaton = preload("generator/automaton.gd")
 
 @export var generator: ProcGen:
 	set(value):
 		if generator:
-			generator.finished.disconnect(_on_generator_finished)
+			generator.automaton_iteration_finished.disconnect(_on_automaton_iteration)
 		generator = value
 		if generator:
-			generator.finished.connect(_on_generator_finished)
+			generator.automaton_iteration_finished.connect(_on_automaton_iteration)
 		update_configuration_warnings()
-		_on_generator_finished()
+		_on_automaton_iteration()
 @export var show_partitions: bool = true:
 	set(value):
 		show_partitions = value
@@ -55,18 +58,29 @@ class_name ProcGenVisualizer extends Sprite2D
 	set(value):
 		corridor_color = value
 		queue_redraw()
-@export var automaton_empty_color: Color = Color.WHITE:
+@export var automaton_empty_color: Color = Color("dfdfdf"):
 	set(value):
 		automaton_empty_color = value
 		_update_automaton()
 		_update_automaton_visibility()
-@export var automaton_full_color: Color = Color.BLACK:
+@export var automaton_full_color: Color = Color("323232"):
 	set(value):
 		automaton_full_color = value
 		_update_automaton()
 		_update_automaton_visibility()
+@export var automaton_fixed_empty_color: Color = Color.WHITE:
+	set(value):
+		automaton_fixed_empty_color = value
+		_update_automaton()
+		_update_automaton_visibility()
+@export var automaton_fixed_full_color: Color = Color.BLACK:
+	set(value):
+		automaton_fixed_full_color = value
+		_update_automaton()
+		_update_automaton_visibility()
 
 var _texture: ImageTexture
+
 
 func _get_configuration_warnings() -> PackedStringArray:
 	if not generator:
@@ -75,7 +89,7 @@ func _get_configuration_warnings() -> PackedStringArray:
 
 
 func _draw() -> void:
-	if not generator or not generator._generator.bsp:
+	if not generator:
 		return
 	draw_set_transform(-generator.map_size / 2)
 	if show_corridors:
@@ -83,15 +97,15 @@ func _draw() -> void:
 			draw_rect(
 				Rect2i(point.x, point.y, 1, 1).grow(generator.corridor_width_expand),
 				corridor_color,
-				true
+				true,
 			)
 	for leaf in generator._generator.bsp.get_leaves():
 		if show_partitions:
 			draw_rect(
 				leaf.rect,
-				partition_color, 
+				partition_color,
 				false,
-				1 + generator.automaton_zones_outline_expand
+				1 + generator.automaton_zones_outline_expand,
 			)
 		if show_rooms:
 			draw_rect(leaf.room_rect, partition_room_color, true)
@@ -101,7 +115,7 @@ func _draw() -> void:
 					leaf.room_rect.get_center(),
 					adj.room_rect.get_center(),
 					link_color,
-					1
+					1,
 				)
 	if show_used_links:
 		for link in generator._generator.bsp.graph.final_links:
@@ -109,37 +123,50 @@ func _draw() -> void:
 				link[0].room_rect.get_center(),
 				link[1].room_rect.get_center(),
 				used_link_color,
-				1
+				1,
 			)
 
 
 func _update_automaton():
-	if not generator:
+	if not generator or not generator._generator.automaton.initialized:
 		_texture = null
 		return
 	var image := Image.create_empty(
 		generator.map_size.x,
 		generator.map_size.y,
 		false,
-		Image.FORMAT_RGBA8
+		Image.FORMAT_RGBA8,
 	)
 	var color: Color
 	for x in range(generator.map_size.x):
 		for y in range(generator.map_size.y):
-			if generator.is_full_at(Vector2i(x, y)):
-				color = automaton_full_color
-			else:
-				color = automaton_empty_color
-			image.set_pixel(x, y, color)
+			image.set_pixel(
+				x,
+				y,
+				_get_state_color(generator._generator.automaton.get_front_cell(x, y)),
+			)
 	_texture = ImageTexture.create_from_image(image)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
+
+func _get_state_color(state: Automaton.State) -> Color:
+	match state:
+		Automaton.State.ON:
+			return automaton_full_color
+		Automaton.State.OFF:
+			return automaton_empty_color
+		Automaton.State.FIXED_ON:
+			return automaton_fixed_full_color
+		Automaton.State.FIXED_OFF:
+			return automaton_fixed_empty_color
+	return Color.WEB_PURPLE
 
 
 func _update_automaton_visibility():
 	texture = _texture if show_automaton else null
 
 
-func _on_generator_finished():
+func _on_automaton_iteration():
 	_update_automaton()
 	_update_automaton_visibility()
 	queue_redraw()
