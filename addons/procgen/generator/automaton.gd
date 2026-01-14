@@ -6,10 +6,23 @@ signal finished
 signal iteration_finished
 signal _region_compute_step_finished
 signal _region_compute_finished
+signal _flood_fill_finished
+signal _smooth_step_finished
 
 const Context = preload("context.gd")
 const BSP = preload("bsp.gd")
 const Router = preload("router.gd")
+
+const NEIGHBOR_DIRS := [
+	Vector2i.UP,
+	Vector2i.DOWN,
+	Vector2i.LEFT,
+	Vector2i.RIGHT,
+	Vector2i(-1, -1),
+	Vector2i(1, -1),
+	Vector2i(-1, 1),
+	Vector2i(1, 1),
+]
 
 var ctx: Context
 var front_matrix: Array[Array]
@@ -18,6 +31,8 @@ var threads: Array[Array]
 var initialized: bool = false
 
 var _region_computed: int
+var _visited_cells: Dictionary[Vector2i, bool]
+var _current_cell_group: Array[Vector2i]
 
 
 func _init() -> void:
@@ -42,6 +57,9 @@ func generate(context: Context, bsp: BSP, router: Router):
 		for i in range(ctx.automaton_iterations):
 			await iterate()
 			iteration_finished.emit()
+		if ctx.automaton_flood_fill:
+			await apply_flood_fill()
+		await run_smooth_step()
 	finished.emit()
 
 
@@ -117,14 +135,32 @@ func iterate():
 		t[0].wait_to_finish()
 
 
+func run_smooth_step():
+	if threads.is_empty():
+		_run_smooth_step()
+		return
+	threads[0][0].start(_run_smooth_step)
+	await _smooth_step_finished
+	threads[0][0].wait_to_finish()
+
+
+func _run_smooth_step():
+	for x in range(ctx.map_size.x):
+		for y in range(ctx.map_size.y):
+			if get_front_cell(x, y) == State.ON \
+			and get_surrounding_front_on_cells_count(x, y) < ctx.automaton_smoothing_step_cell_min_neighbors:
+				set_front_cell(x, y, State.OFF)
+	call_deferred("emit_signal", "_smooth_step_finished")
+
+
 func get_front_cell(x: int, y: int) -> State:
-	if x >= 0 and x < ctx.map_size.x and y >= 0 and y < ctx.map_size.y:
+	if is_in_bounds(x, y):
 		return front_matrix[y][x]
-	return State.OFF
+	return State.FIXED_ON
 
 
 func set_front_cell(x: int, y: int, state: State):
-	if x >= 0 and x < ctx.map_size.x and y >= 0 and y < ctx.map_size.y:
+	if is_in_bounds(x, y):
 		front_matrix[y][x] = state
 
 
@@ -144,13 +180,13 @@ func set_front_point(at: Vector2i, state: State, expand: int = 0):
 
 
 func get_back_cell(x: int, y: int) -> State:
-	if x >= 0 and x < ctx.map_size.x and y >= 0 and y < ctx.map_size.y:
+	if is_in_bounds(x, y):
 		return back_matrix[y][x]
-	return State.OFF
+	return State.FIXED_ON
 
 
 func set_back_cell(x: int, y: int, state: State):
-	if x >= 0 and x < ctx.map_size.x and y >= 0 and y < ctx.map_size.y:
+	if is_in_bounds(x, y):
 		back_matrix[y][x] = state
 
 
@@ -170,6 +206,23 @@ func get_surrounding_on_cells_count(x: int, y: int) -> int:
 		get_back_cell(x + 1, y - 1),
 		get_back_cell(x + 1, y + 1),
 	].reduce(_accumulate_on_cell, 0)
+
+
+func get_surrounding_front_on_cells_count(x: int, y: int) -> int:
+	return [
+		get_front_cell(x, y - 1),
+		get_front_cell(x, y + 1),
+		get_front_cell(x - 1, y),
+		get_front_cell(x + 1, y),
+		get_front_cell(x - 1, y - 1),
+		get_front_cell(x - 1, y + 1),
+		get_front_cell(x + 1, y - 1),
+		get_front_cell(x + 1, y + 1),
+	].reduce(_accumulate_on_cell, 0)
+
+
+func is_in_bounds(x: int, y: int) -> bool:
+	return x >= 0 and x < ctx.map_size.x and y >= 0 and y < ctx.map_size.y
 
 
 func compute_cell(x: int, y: int):
@@ -265,6 +318,55 @@ func get_sub_rects(n: int) -> Array[Rect2i]:
 
 	rects.resize(min(rects.size(), n))
 	return rects
+
+
+func apply_flood_fill():
+	if threads.is_empty():
+		_apply_flood_fill()
+		return
+	threads[0][0].start(_apply_flood_fill)
+	await _flood_fill_finished
+	threads[0][0].wait_to_finish()
+
+
+func _apply_flood_fill():
+	var pos: Vector2i
+	_visited_cells.clear()
+	for x in range(ctx.map_size.x):
+		for y in range(ctx.map_size.y):
+			pos = Vector2i(x, y)
+			_current_cell_group.clear()
+			if not _visited_cells.has(pos) \
+			and get_front_cell(x, y) == State.OFF \
+			and _flood_fill_explore(pos):
+				for point in _current_cell_group:
+					set_front_cell(point.x, point.y, State.ON)
+	call_deferred("emit_signal", "_flood_fill_finished")
+
+
+func _flood_fill_explore(start: Vector2i) -> bool:
+	var is_hole := true
+	var stack: Array[Vector2i] = [start]
+
+	while not stack.is_empty():
+		var at := stack.pop_back()
+		if not is_in_bounds(at.x, at.y):
+			is_hole = false
+			continue
+		if _visited_cells.has(at):
+			continue
+
+		var state := get_front_cell(at.x, at.y)
+		if state == State.ON or state == State.FIXED_ON:
+			continue
+		_visited_cells[at] = true
+		_current_cell_group.append(at)
+		if state == State.FIXED_OFF:
+			is_hole = false
+		for dir in NEIGHBOR_DIRS:
+			stack.push_back(at + dir)
+
+	return is_hole
 
 
 func _accumulate_on_cell(on_count: int, state: State) -> int:

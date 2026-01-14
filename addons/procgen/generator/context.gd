@@ -24,5 +24,6 @@ var automaton_threads: int
 var automaton_zones_fixed_outline_expand: int
 var automaton_corridor_fixed_width_expand: int
 var automaton_corridor_non_fixed_width_expand: int
+var automaton_smoothing_step_cell_min_neighbors: int
 
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()

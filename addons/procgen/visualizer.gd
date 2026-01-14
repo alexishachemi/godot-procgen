@@ -102,7 +102,7 @@ func _draw() -> void:
 	if show_corridors:
 		for point in generator._generator.router.points:
 			draw_rect(
-				Rect2i(point.x, point.y, 1, 1).grow(generator.corridor_width_expand),
+				Rect2i(point.x, point.y, 1, 1).grow(generator.automaton_corridor_fixed_width_expand),
 				corridor_color,
 				true,
 			)
@@ -112,7 +112,7 @@ func _draw() -> void:
 				leaf.rect,
 				partition_color,
 				false,
-				1 + generator.automaton_zones_outline_expand,
+				1 + generator.automaton_zones_fixed_outline_expand,
 			)
 		if show_rooms:
 			draw_rect(leaf.room_rect, partition_room_color, true)

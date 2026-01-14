@@ -8,7 +8,7 @@ signal automaton_iteration_finished
 const Context = preload("generator/context.gd")
 
 @export_tool_button("Generate") var _generate_callback = generate
-@export var map_size: Vector2i = Vector2i(300, 300):
+@export var map_size: Vector2i = Vector2i(100, 100):
 	set(value):
 		map_size = Vector2i.ONE.max(value)
 
@@ -43,7 +43,7 @@ const Context = preload("generator/context.gd")
 @export_group("Rooms", "room")
 
 ## The amount of rooms that will be generated.
-@export_range(1, 1, 1, "or_greater") var room_amount: int
+@export_range(1, 1, 1, "or_greater") var room_amount: int = 5
 
 ## The ratio of how squared rooms are. Note that this can impact the
 ## target coverage of rooms. [br]
@@ -98,7 +98,7 @@ const Context = preload("generator/context.gd")
 
 ## The number of iteration to run the Cellular Automata. More iterations will
 ## lead to more "eroded" looking terrain. [code]0[/code] to disable it.
-@export_range(0, 1, 1, "or_greater") var automaton_iterations: int
+@export_range(0, 1, 1, "or_greater") var automaton_iterations: int = 5
 
 ## The minimum number of neighboring cells set to full for the current cell to
 ## also be full. (i.e. given a cell at a given position,
@@ -117,11 +117,13 @@ const Context = preload("generator/context.gd")
 ## The chance that a cell will be full at the initial state of the automaton.
 ## [code]0.0[/code] -> every cell is empty. [br]
 ## [code]1.0[/code] -> every cell is full.
-@export_range(0.0, 1.0, 0.01) var automaton_noise_rate: float
+@export_range(0.0, 1.0, 0.01) var automaton_noise_rate: float = 0.7
 
 ## If set, will fill up isolated holes in the grid at the end of the all
 ## automaton iterations.
-@export var automaton_flood_fill: bool
+## [br][br][b]Note[/b]: If [member ProcGen.automaton_threads] if at least
+## [code]1[/code], then a separate thread is used to compute the flood fill.
+@export var automaton_flood_fill: bool = true
 
 ## Number of separate threads to use when generating the cellular automata.
 ## To avoid freezing the editor, the main thread is not used to generate. [br] [br]
@@ -152,7 +154,12 @@ const Context = preload("generator/context.gd")
 ## [code]0[/code] -> fixed_width + 1 unit wide corridors at the start. [br]
 ## [code]1[/code] -> fixed_width + 3 unit wide corridors at the start. [br]
 ## [code]3[/code] -> fixed_width + 5 unit wide corridors at the start. [br]
-@export_range(-1, 1, 1, "or_greater") var automaton_corridor_non_fixed_width_expand: int = 1
+@export_range(0, 1, 1, "or_greater") var automaton_corridor_non_fixed_width_expand: int = 2
+
+## The minimum number of neighboring cells set to full for the current cell to
+## also be full.[br]
+## This is applied once after the last iteration and only on full tiles.
+@export_range(0, 8, 1) var automaton_smoothing_step_cell_min_neighbors: int = 4
 
 var _generator := preload("generator/generator.gd").new()
 
@@ -196,6 +203,7 @@ func generate():
 	ctx.automaton_zones_fixed_outline_expand = automaton_zones_fixed_outline_expand
 	ctx.automaton_corridor_fixed_width_expand = automaton_corridor_fixed_width_expand
 	ctx.automaton_corridor_non_fixed_width_expand = automaton_corridor_non_fixed_width_expand
+	ctx.automaton_smoothing_step_cell_min_neighbors = automaton_smoothing_step_cell_min_neighbors
 
 	if generate_new_seed_on_run:
 		seed = randi()
@@ -214,20 +222,16 @@ func is_full_at(at: Vector2i) -> bool:
 ## The area of those rectangles is [i]guaranteed[/i] to be empty space. [br]
 ## Returns an empty array if called before calling [method ProcGen.generate].
 func get_rooms() -> Array[Rect2i]:
-	return _generator.bsp.get_all_rooms() if _generator.bsp else []
+	return _generator.bsp.get_all_rooms()
 
-## Returns corridor
-## The area of those rectangles is [i]guaranteed[/i] to be empty space. [br]
+
+## Returns points that have been designated as corridors.
+## These points (and the area around them defined by
+## [member ProcGen.automaton_corridor_fixed_width_expand])
+## are [i]guaranteed[/i] to be empty space. [br]
 ## Returns an empty array if called before calling [method ProcGen.generate].
-#func get_corridor_segments() -> Array[Array]:
-#if not _generator.bsp:
-#return []
-#var rooms: Array[Rect2i]
-#rooms.resize(room_amount)
-#var leaves := _generator.bsp.get_leaves()
-#for i in range(room_amount):
-#rooms[i] = leaves[i].room_rect
-#return rooms
+func get_corridor_areas() -> Array[Vector2i]:
+	return _generator.router.points
 
 
 ## Returns [code]true[/code] if the generator is currently active.

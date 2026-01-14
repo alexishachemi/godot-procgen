@@ -54,6 +54,8 @@ func clear():
 	east_frontiers = []
 	adjacents = []
 	group = []
+	rect = Rect2i(0, 0, 0, 0)
+	room_rect = Rect2i(0, 0, 0, 0)
 	parent = null
 	sub1 = null
 	sub2 = null
@@ -75,6 +77,8 @@ func is_leaf() -> bool:
 
 
 func get_leaves() -> Array[BSP]:
+	if rect == Rect2i(0, 0, 0, 0):
+		return []
 	if is_leaf():
 		return [self]
 	return sub1.get_leaves() + sub2.get_leaves()
@@ -171,10 +175,12 @@ func get_shallowest_leaf(shallowest: BSP = null) -> BSP:
 #region Room ###################################################################
 
 func get_all_rooms() -> Array[Rect2i]:
-	var rooms: Array[Rect2i]
-	rooms.resize(ctx.room_amount)
 	var leaves := get_leaves()
-	for i in range(ctx.room_amount):
+	if leaves.is_empty():
+		return []
+	var rooms: Array[Rect2i]
+	rooms.resize(leaves.size())
+	for i in range(leaves.size()):
 		rooms[i] = leaves[i].room_rect
 	return rooms
 
