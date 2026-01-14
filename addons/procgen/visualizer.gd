@@ -7,9 +7,11 @@ const Automaton = preload("generator/automaton.gd")
 @export var generator: ProcGen:
 	set(value):
 		if generator:
+			generator.finished.disconnect(_on_automaton_iteration)
 			generator.automaton_iteration_finished.disconnect(_on_automaton_iteration)
 		generator = value
 		if generator:
+			generator.finished.connect(_on_automaton_iteration)
 			generator.automaton_iteration_finished.connect(_on_automaton_iteration)
 		update_configuration_warnings()
 		_on_automaton_iteration()
@@ -36,6 +38,11 @@ const Automaton = preload("generator/automaton.gd")
 @export var show_automaton: bool = true:
 	set(value):
 		show_automaton = value
+		_update_automaton_visibility()
+@export var highlight_automaton_fixed_states: bool = true:
+	set(value):
+		highlight_automaton_fixed_states = value
+		_update_automaton()
 		_update_automaton_visibility()
 
 @export var partition_color: Color = Color.BLUE:
@@ -132,8 +139,8 @@ func _update_automaton():
 		_texture = null
 		return
 	var image := Image.create_empty(
-		generator.map_size.x,
-		generator.map_size.y,
+		generator._generator.automaton.ctx.map_size.x,
+		generator._generator.automaton.ctx.map_size.y,
 		false,
 		Image.FORMAT_RGBA8,
 	)
@@ -151,6 +158,10 @@ func _update_automaton():
 
 func _get_state_color(state: Automaton.State) -> Color:
 	match state:
+		Automaton.State.ON, Automaton.State.FIXED_ON when not highlight_automaton_fixed_states:
+			return automaton_full_color
+		Automaton.State.OFF, Automaton.State.FIXED_OFF when not highlight_automaton_fixed_states:
+			return automaton_empty_color
 		Automaton.State.ON:
 			return automaton_full_color
 		Automaton.State.OFF:

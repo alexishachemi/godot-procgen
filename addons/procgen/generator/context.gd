@@ -12,7 +12,6 @@ var room_min_squared_ratio: float
 var room_max_squared_ratio: float
 var room_center_ratio: float
 
-var corridor_width_expand: int
 var corridor_edge_overlap_min_ratio: float
 var corridor_cycle_chance: float
 
@@ -22,6 +21,8 @@ var automaton_cell_max_neighbors: int
 var automaton_noise_rate: float
 var automaton_flood_fill: bool
 var automaton_threads: int
-var automaton_zones_outline_expand: int
+var automaton_zones_fixed_outline_expand: int
+var automaton_corridor_fixed_width_expand: int
+var automaton_corridor_non_fixed_width_expand: int
 
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()

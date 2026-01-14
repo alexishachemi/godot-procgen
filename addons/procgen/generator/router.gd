@@ -39,7 +39,7 @@ func route_rooms(from: Rect2i, to: Rect2i):
 
 
 func discourage_room(room: Rect2i):
-	grid.fill_weight_scale_region(room.grow(ctx.corridor_width_expand), 2)
+	grid.fill_weight_scale_region(room.grow(ctx.automaton_corridor_fixed_width_expand), 2)
 	grid.fill_weight_scale_region(room, 1)
 
 

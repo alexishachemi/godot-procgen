@@ -80,12 +80,6 @@ const Context = preload("generator/context.gd")
 
 @export_group("Corridors", "corridor")
 
-## Amount to expand the width corridors. [br]
-## [code]0[/code] -> 1 unit wide corridors. [br]
-## [code]1[/code] -> 3 units wide corridors. [br]
-## [code]3[/code] -> 5 units wide corridors. [br]
-@export_range(0, 1, 1, "or_greater") var corridor_width_expand: int = 0
-
 ## The minimum ratio, of overlap between 2 zones' edges to be considered
 ## adjacent. Adjacent zones are zones whose rooms can be connected with
 ## corridors [br]
@@ -142,7 +136,23 @@ const Context = preload("generator/context.gd")
 ## [code]1[/code] -> 3 units wide outline. [br]
 ## [code]3[/code] -> 5 units wide outline. [br]
 ## [code]-1[/code] -> No outline. [br]
-@export_range(-1, 1, 1, "or_greater") var automaton_zones_outline_expand: int = 1
+@export_range(-1, 1, 1, "or_greater") var automaton_zones_fixed_outline_expand: int = 1
+
+## Amount to expand the [i]immutable[/i] width of corridors. [br]
+## Fixed width cannot change during the generation and is thus guaranteed to be at
+## least this amount.
+## [code]0[/code] -> 1 unit wide corridors. [br]
+## [code]1[/code] -> 3 units wide corridors. [br]
+## [code]3[/code] -> 5 units wide corridors. [br]
+@export_range(0, 1, 1, "or_greater") var automaton_corridor_fixed_width_expand: int = 0
+
+## Amount to expand the [i]mutable[/i] width of corridors. [br]
+## Non-fixed width can change during the generation. this amount expands on
+## [member ProcGen.automaton_corridor_fixed_width_expand].
+## [code]0[/code] -> fixed_width + 1 unit wide corridors at the start. [br]
+## [code]1[/code] -> fixed_width + 3 unit wide corridors at the start. [br]
+## [code]3[/code] -> fixed_width + 5 unit wide corridors at the start. [br]
+@export_range(-1, 1, 1, "or_greater") var automaton_corridor_non_fixed_width_expand: int = 1
 
 var _generator := preload("generator/generator.gd").new()
 
@@ -174,7 +184,6 @@ func generate():
 	ctx.room_max_coverage = room_max_coverage
 	ctx.room_center_ratio = room_center_ratio
 
-	ctx.corridor_width_expand = corridor_width_expand
 	ctx.corridor_edge_overlap_min_ratio = corridor_edge_overlap_min_ratio
 	ctx.corridor_cycle_chance = corridor_cycle_chance
 
@@ -184,7 +193,9 @@ func generate():
 	ctx.automaton_noise_rate = automaton_noise_rate
 	ctx.automaton_flood_fill = automaton_flood_fill
 	ctx.automaton_threads = automaton_threads
-	ctx.automaton_zones_outline_expand = automaton_zones_outline_expand
+	ctx.automaton_zones_fixed_outline_expand = automaton_zones_fixed_outline_expand
+	ctx.automaton_corridor_fixed_width_expand = automaton_corridor_fixed_width_expand
+	ctx.automaton_corridor_non_fixed_width_expand = automaton_corridor_non_fixed_width_expand
 
 	if generate_new_seed_on_run:
 		seed = randi()
