@@ -63,11 +63,11 @@ func clear():
 
 #region Utils ##################################################################
 
-func create_child(rect: Rect2i) -> BSP:
+func create_child(child_rect: Rect2i) -> BSP:
 	var child := BSP.new()
 	child.ctx = ctx
 	child.depth = depth + 1
-	child.rect = rect
+	child.rect = child_rect
 	child.parent = self
 	return child
 
@@ -89,18 +89,18 @@ func print_tree():
 
 
 func _get_tree_string(indent: String = "") -> String:
-	var str: String = "[rect: %s; room: %s; depth: %s; split: %s]" % [
+	var tree_str: String = "[rect: %s; room: %s; depth: %s; split: %s]" % [
 		rect,
 		room_rect,
 		depth,
 		get_split_orientation_str(split_orientation),
 	]
 	if is_leaf():
-		str = "[color=light_green]%s[/color]" % str
+		tree_str = "[color=light_green]%s[/color]" % tree_str
 	else:
-		str += "\n" + indent + "├──" + sub1._get_tree_string(indent + "│  ")
-		str += "\n" + indent + "└──" + sub2._get_tree_string(indent + "   ")
-	return str
+		tree_str += "\n" + indent + "├──" + sub1._get_tree_string(indent + "│  ")
+		tree_str += "\n" + indent + "└──" + sub2._get_tree_string(indent + "   ")
+	return tree_str
 
 
 static func get_split_orientation_str(orientation: SplitOrientation) -> String:
@@ -140,14 +140,14 @@ func split(orientation: SplitOrientation):
 	var rect1: Rect2i
 	var rect2: Rect2i
 	if orientation == SplitOrientation.HORIZONTAL:
-		var min_n: int = max(1, rect.size.y / 2)
+		var min_n: int = maxi(1, int(rect.size.y / 2.0))
 		min_n = max(min_n, round(rect.size.y * ctx.zone_split_max_ratio))
 		var max_n: int = clamp(rect.size.y - min_n, 1, rect.size.y)
 		var n: int = ctx.rng.randi_range(min_n, max_n)
 		rect1 = Rect2i(rect.position, Vector2i(rect.size.x, n))
 		rect2 = Rect2i(rect.position.x, rect.position.y + n, rect.size.x, rect.size.y - rect1.size.y)
 	else:
-		var min_n: int = max(1, rect.size.x / 2)
+		var min_n: int = maxi(1, int(rect.size.x / 2.0))
 		min_n = max(min_n, round(rect.size.x * ctx.zone_split_max_ratio))
 		var max_n: int = clamp(rect.size.x - min_n, 1, rect.size.x)
 		var n: int = ctx.rng.randi_range(min_n, max_n)
@@ -383,8 +383,8 @@ class Graph:
 		var rng: RandomNumberGenerator
 
 
-		func _init(rng: RandomNumberGenerator) -> void:
-			self.rng = rng
+		func _init(random_number_generator: RandomNumberGenerator) -> void:
+			rng = random_number_generator
 
 
 		func traverse(bsp: BSP):
@@ -419,8 +419,8 @@ class Graph:
 			or (link[1] == m1 and link[0] == m2)
 
 
-		static func find_links(bsp: BSP, rng: RandomNumberGenerator) -> Array[Array]:
-			var nav := Nav.new(rng)
+		static func find_links(bsp: BSP, custom_rng: RandomNumberGenerator) -> Array[Array]:
+			var nav := Nav.new(custom_rng)
 			nav.traverse(bsp)
 			nav.shuffle_links()
 			return nav.links

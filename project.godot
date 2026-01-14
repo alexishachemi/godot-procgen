@@ -10,10 +10,24 @@ config_version=5
 
 [application]
 
-config/name="Plugin"
+config/name="ProcGen"
 run/main_scene="uid://2wng6einj3df"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
+
+[debug]
+
+gdscript/warnings/exclude_addons=false
+
+[display]
+
+window/size/viewport_width=100
+window/size/viewport_height=100
+window/stretch/mode="canvas_items"
+
+[editor]
+
+movie_writer/movie_file="C:/Users/Alexis/Godot/Projects/godot-procgen/addons/procgen/assets/video.avi"
 
 [editor_plugins]
 

@@ -16,7 +16,6 @@ func _init():
 
 
 func generate(context: Context, bsp: BSP):
-	var path: Array[Vector2i]
 	var rooms = bsp.get_all_rooms()
 	ctx = context
 	points = []
@@ -30,8 +29,8 @@ func generate(context: Context, bsp: BSP):
 
 
 func route_rooms(from: Rect2i, to: Rect2i):
-	var path := grid.get_id_path(from.get_center(), to.get_center())
-	path.filter(func(x): from.has_point(x) or to.has_point(x))
+	var path: Array[Vector2i] = grid.get_id_path(from.get_center(), to.get_center())
+	path = path.filter(func(x): return not from.has_point(x) and not to.has_point(x))
 	for point in path:
 		if grid.get_point_weight_scale(point) == 1.0:
 			grid.set_point_weight_scale(point, 0.5)

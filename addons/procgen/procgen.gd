@@ -11,7 +11,7 @@ extends Node
 ## You first need to set the appropriate [member map_size]. Higher values will
 ## drastically increase generation time. Optionally you may also set a custom seed.
 ## The generator uses an internal [RandomNumberGenerator] and is thus not affected
-## by the global random seed. Don't forget to disable [member generate_new_seed_on_run]
+## by the global random seed. Don't forget to disable [member generate_seed]
 ## or else your seed will be overriten before starting the generator.[br][br]
 ## Once set, you may specify the amount of rooms desired with [member room_amount],
 ## and the number of iterations to apply on the resulting layout with
@@ -72,6 +72,7 @@ signal automaton_iteration_finished
 
 const _Context = preload("generator/context.gd")
 
+@warning_ignore("unused_private_class_variable")
 @export_tool_button("Generate") var _generate_callback = generate
 
 ## The size of the generated grid. [b]Must[/b] be at least 10x10.
@@ -79,12 +80,12 @@ const _Context = preload("generator/context.gd")
 	set(value):
 		map_size = map_size.maxi(10)
 
-## Generates a new seed and writes it to [member seed] before running
-## a generation.
-@export var generate_new_seed_on_run: bool = true
+## Generates a new seed and writes it to [member seed] before running a generation.
+@export var generate_seed: bool = true
 
 ## Seed used by the generator's random number generator. Will be overwritten if
-## [member generate_new_seed_on_run] is set to [code]true[/code].
+## [member generate_seed] is set to [code]true[/code].
+@warning_ignore("shadowed_global_identifier")
 @export var seed: int
 
 @export_group("Zones", "zone")
@@ -272,7 +273,7 @@ func generate():
 	ctx.automaton_corridor_non_fixed_width_expand = automaton_corridor_non_fixed_width_expand
 	ctx.automaton_smoothing_step_cell_min_neighbors = automaton_smoothing_step_cell_min_neighbors
 
-	if generate_new_seed_on_run:
+	if generate_seed:
 		seed = randi()
 	ctx.rng.seed = seed
 	await _generator.generate(ctx)

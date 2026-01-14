@@ -145,7 +145,6 @@ func _update_automaton():
 		false,
 		Image.FORMAT_RGBA8,
 	)
-	var color: Color
 	for x in range(generator.map_size.x):
 		for y in range(generator.map_size.y):
 			image.set_pixel(

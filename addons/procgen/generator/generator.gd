@@ -20,9 +20,9 @@ func _init():
 	automaton.finished.connect(_on_automaton_finished)
 
 
-func generate(ctx: Context):
+func generate(context: Context):
 	generating = true
-	self.ctx = ctx
+	ctx = context
 	bsp.generate(ctx)
 	router.generate(ctx, bsp)
 	automaton.generate(ctx, bsp, router)

@@ -105,10 +105,8 @@ func set_rect_outline_fixed(rect: Rect2i):
 
 
 func pre_fill():
-	var state: State
 	for x in range(ctx.map_size.x):
 		for y in range(ctx.map_size.y):
-			state = get_front_cell(x, y)
 			if ctx.rng.randf() < ctx.automaton_noise_rate:
 				set_front_cell(x, y, State.ON)
 			else:
@@ -299,15 +297,15 @@ func get_sub_rects(n: int) -> Array[Rect2i]:
 			break
 
 		if size.x >= size.y and size.x > 1:
-			var a_w := size.x / 2
+			var a_w := int(size.x / 2.0)
 			var b_w := size.x - a_w
 			var a := Rect2i(pos, Vector2i(a_w, size.y))
 			var b := Rect2i(pos + Vector2i(a_w, 0), Vector2i(b_w, size.y))
 			rects.append(a)
 			rects.append(b)
 		elif size.y > 1:
-			var a_h := size.y / 2
-			var b_h := size.y - a_h # remainder goes here
+			var a_h := int(size.y / 2.0)
+			var b_h := size.y - a_h
 			var a := Rect2i(pos, Vector2i(size.x, a_h))
 			var b := Rect2i(pos + Vector2i(0, a_h), Vector2i(size.x, b_h))
 			rects.append(a)
@@ -349,7 +347,7 @@ func _flood_fill_explore(start: Vector2i) -> bool:
 	var stack: Array[Vector2i] = [start]
 
 	while not stack.is_empty():
-		var at := stack.pop_back()
+		var at: Vector2i = stack.pop_back()
 		if not is_in_bounds(at.x, at.y):
 			is_hole = false
 			continue
