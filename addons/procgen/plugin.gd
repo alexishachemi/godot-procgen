@@ -1,22 +1,11 @@
 @tool
 extends EditorPlugin
 
-
-func _enable_plugin() -> void:
-	# Add autoloads here.
-	pass
-
-
-func _disable_plugin() -> void:
-	# Remove autoloads here.
-	pass
-
-
 func _enter_tree() -> void:
-	# Initialization of the plugin goes here.
-	pass
+	add_custom_type("ProcGen", "Node", preload("procgen.gd"), preload("assets/procgen.png"))
+	add_custom_type("ProcGenVisualizer", "Sprite2D", preload("visualizer.gd"), preload("assets/visualizer.png"))
 
 
 func _exit_tree() -> void:
-	# Clean-up of the plugin goes here.
-	pass
+	remove_custom_type("ProcGen")
+	remove_custom_type("ProcGenVisualizer")

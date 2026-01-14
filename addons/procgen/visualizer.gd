@@ -1,6 +1,7 @@
 @tool
 class_name ProcGenVisualizer
 extends Sprite2D
+## Visualization utility for [ProcGen] generators.
 
 const Automaton = preload("generator/automaton.gd")
 
