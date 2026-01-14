@@ -141,10 +141,25 @@ func get_shallowest_leaf(shallowest: BSP = null) -> BSP:
 
 #region Room ###################################################################
 
+func get_all_rooms() -> Array[Rect2i]:
+	var rooms: Array[Rect2i]
+	rooms.resize(ctx.room_amount)
+	var leaves := get_leaves()
+	for i in range(ctx.room_amount):
+		rooms[i] = leaves[i].room_rect
+	return rooms
+
 func generate_room():
 	var area := _compute_room_area()
-	var size := _compute_size(area)
-	var pos := _compute_position(size)
+	var size: Vector2i
+	var pos: Vector2i
+	if area == rect.get_area():
+		var r := rect.grow(-1)
+		size = r.size
+		pos = r.position
+	else:
+		size = _compute_size(area)
+		pos = _compute_position(size)
 	room_rect = Rect2i(pos, size)
 
 
@@ -282,6 +297,9 @@ class Graph:
 				g2.add(link)
 			else:
 				discarded_links.append(link)
+		for link in discarded_links:
+			if ctx.rng.randf() < ctx.corridor_cycle_chance:
+				final_links.append(link)
 		for group in groups:
 			final_links.append_array(group.links)
 

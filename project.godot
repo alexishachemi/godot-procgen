@@ -14,3 +14,7 @@ config/name="Plugin"
 run/main_scene="uid://2wng6einj3df"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/GDQuest_GDScript_formatter/plugin.cfg")

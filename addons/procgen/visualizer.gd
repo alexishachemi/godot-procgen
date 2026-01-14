@@ -1,15 +1,15 @@
 @tool
-class_name ProcGenVisualizer extends Node2D
+class_name ProcGenVisualizer extends Sprite2D
 
 @export var generator: ProcGen:
 	set(value):
 		if generator:
-			generator.finished.disconnect(queue_redraw)
+			generator.finished.disconnect(_on_generator_finished)
 		generator = value
 		if generator:
-			generator.finished.connect(queue_redraw)
+			generator.finished.connect(_on_generator_finished)
 		update_configuration_warnings()
-		queue_redraw()
+		_on_generator_finished()
 @export var show_partitions: bool = true:
 	set(value):
 		show_partitions = value
@@ -33,12 +33,40 @@ class_name ProcGenVisualizer extends Node2D
 @export var show_automaton: bool = true:
 	set(value):
 		show_automaton = value
-		queue_redraw()
+		_update_automaton_visibility()
 
-@export var partition_color: Color = Color.BLUE
-@export var partition_room_color: Color = Color.BEIGE
-@export var link_color: Color = Color.RED
-@export var used_link_color: Color = Color.GREEN
+@export var partition_color: Color = Color.BLUE:
+	set(value):
+		partition_color = value
+		queue_redraw()
+@export var partition_room_color: Color = Color.BEIGE:
+	set(value):
+		partition_room_color = value
+		queue_redraw()
+@export var link_color: Color = Color.RED:
+	set(value):
+		link_color = value
+		queue_redraw()
+@export var used_link_color: Color = Color.GREEN:
+	set(value):
+		used_link_color = value
+		queue_redraw()
+@export var corridor_color: Color = Color.SADDLE_BROWN:
+	set(value):
+		corridor_color = value
+		queue_redraw()
+@export var automaton_empty_color: Color = Color.WHITE:
+	set(value):
+		automaton_empty_color = value
+		_update_automaton()
+		_update_automaton_visibility()
+@export var automaton_full_color: Color = Color.BLACK:
+	set(value):
+		automaton_full_color = value
+		_update_automaton()
+		_update_automaton_visibility()
+
+var _texture: ImageTexture
 
 func _get_configuration_warnings() -> PackedStringArray:
 	if not generator:
@@ -49,9 +77,22 @@ func _get_configuration_warnings() -> PackedStringArray:
 func _draw() -> void:
 	if not generator or not generator._generator.bsp:
 		return
+	draw_set_transform(-generator.map_size / 2)
+	if show_corridors:
+		for point in generator._generator.router.points:
+			draw_rect(
+				Rect2i(point.x, point.y, 1, 1).grow(generator.corridor_width_expand),
+				corridor_color,
+				true
+			)
 	for leaf in generator._generator.bsp.get_leaves():
 		if show_partitions:
-			draw_rect(leaf.rect, partition_color, false, 1)
+			draw_rect(
+				leaf.rect,
+				partition_color, 
+				false,
+				1 + generator.automaton_zones_outline_expand
+			)
 		if show_rooms:
 			draw_rect(leaf.room_rect, partition_room_color, true)
 		if show_links:
@@ -70,3 +111,35 @@ func _draw() -> void:
 				used_link_color,
 				1
 			)
+
+
+func _update_automaton():
+	if not generator:
+		_texture = null
+		return
+	var image := Image.create_empty(
+		generator.map_size.x,
+		generator.map_size.y,
+		false,
+		Image.FORMAT_RGBA8
+	)
+	var color: Color
+	for x in range(generator.map_size.x):
+		for y in range(generator.map_size.y):
+			if generator.is_full_at(Vector2i(x, y)):
+				color = automaton_full_color
+			else:
+				color = automaton_empty_color
+			image.set_pixel(x, y, color)
+	_texture = ImageTexture.create_from_image(image)
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
+
+func _update_automaton_visibility():
+	texture = _texture if show_automaton else null
+
+
+func _on_generator_finished():
+	_update_automaton()
+	_update_automaton_visibility()
+	queue_redraw()

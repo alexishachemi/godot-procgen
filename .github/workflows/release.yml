@@ -18,7 +18,7 @@ jobs:
       - name: Find plugin.cfg file
         id: find_plugin_cfg
         run: |
-          PLUGIN_CFG=$(find addons -mindepth 2 -maxdepth 2 -name plugin.cfg | head -n 1)
+          PLUGIN_CFG=addons/procgen/plugin.cfg
           if [ -z "$PLUGIN_CFG" ]; then
             echo "SKIP=1" >> $GITHUB_ENV
           else
@@ -49,7 +49,7 @@ jobs:
 
       - name: Zip addons folder
         if: env.SKIP == '0'
-        run: zip -r addons.zip addons
+        run: zip -r addons.zip addons/procgen
 
       - name: Create GitHub Release
         if: env.SKIP == '0'

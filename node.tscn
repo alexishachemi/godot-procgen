@@ -6,11 +6,14 @@
 [node name="Node" type="Node"]
 script = ExtResource("1_sy5k4")
 map_size = Vector2i(100, 100)
-generate_new_seed_on_run = false
-seed = 2280287792
-zone_parent_inverse_orientation_chance = 1.0
+seed = 3803456786
 room_amount = 10
+automaton_noise_rate = 0.71
 
-[node name="Node2D" type="Node2D" parent="." node_paths=PackedStringArray("generator")]
+[node name="Node2D" type="Sprite2D" parent="." node_paths=PackedStringArray("generator")]
+texture_filter = 1
 script = ExtResource("2_j2q8x")
 generator = NodePath("..")
+show_automaton = false
+
+[node name="Camera2D" type="Camera2D" parent="."]
