@@ -1,32 +1,99 @@
 @tool
 class_name ProcGen
 extends Node
+## Room-based procedural cave/dungeon generator.
+##
+## Generates room-based dungeon/caves with extensive settings. [br]
+## [br][b]Note[/b]: This is a GDScript implementation (with some changes)
+## of [url]https://github.com/alexishachemi/ProcGen[/url][br]
+##
+## [br][b]How to use[/b][br][br]
+## You first need to set the appropriate [member map_size]. Higher values will
+## drastically increase generation time. Optionally you may also set a custom seed.
+## The generator uses an internal [RandomNumberGenerator] and is thus not affected
+## by the global random seed. Don't forget to disable [member generate_new_seed_on_run]
+## or else your seed will be overriten before starting the generator.[br][br]
+## Once set, you may specify the amount of rooms desired with [member room_amount],
+## and the number of iterations to apply on the resulting layout with
+## [member automaton_iterations]. Each sections has more settings you can use to
+## fine-tune the desired appearance of the dungeon/cave. [br][br]
+## You can test the generator either by calling [method generate] in your game
+## or pressing the "Generate" button in the inspector. [br][br]
+##
+## Once generated, you can call the following methods to get information about the
+## resulting grid: [method is_full_at], [method get_rooms], [method get_corridor_areas].
+## [br]See [ProcGenVisualizer] for an easy way to see and debug the result
+## of the generator.[br]
+##
+## [br][b]Implementation details[/b][br][br]
+## There are 3 main algorithms used for the generator: [br]
+## - [url=https://en.wikipedia.org/wiki/Binary_space_partitioning]Binary
+## Space Partitioning[/url]: Separating the initial space into sub-spaces
+## to place rooms [br]
+## - [url=https://en.wikipedia.org/wiki/Kruskal's_algorithm]Kruskal's algorithm[/url]:
+## Finding the minimum spanning tree of the generated room graph [br]
+## - [url=https://en.wikipedia.org/wiki/Cellular_automaton]Cellular Automaton[/url]:
+## Creating nartual-looking terrain around the generated rooms and corridors [br]
+##
+## [br]Generation Steps: [br]
+## [br][u]Partitionning[/u][br]
+## 1. Partitions the space until the required amount of rooms is reached[br]
+## 2. Places an inner rectangle for the room inside each partition[br]
+## [br][u]Mapping[/u][br]
+## 3. Finds which rooms are adjacents[br]
+## 4. Links a given amount of room to connect the entire structure[br]
+## [br][u]Corridors[/u][br]
+## 5. Pathfinds corridors to connect each room[br]
+## [br][u]Automaton[/u][br]
+## 6. Places random cells (empty/full) inside every partition[br]
+## 7. Sets the cells around paritions' outlines to have an immutable full state[br]
+## 8. Sets the cells inside rooms and corridors to have an immutable empty state[br]
+## 9. Runs the Cellular Automaton for the given amount of iterations[br]
+## 10. If enabled, Applies a flood fill to remove closed off areas[br]
+## 11. Runs a last step to smooth out ragged edges [br]
+##
+## [br][b][color=yellow]Warning[/color]: About Threads[/b][br]
+## Usage of threads to generate (see [member automaton_threads].) is quite
+## unstable/inefficient currently. The current implementation splits the map into
+## equally (with a minimal offset if not possible) sized regions and assigns a single
+## thread per region. [br]During testing, I have found that I actually
+## get a performance decrease when increasing the number of threads. So for now,
+## I recommend leaving the value at [code]1[/code], as to still have the benefit
+## of not freezing the caller thread when generating.[br]
+##
 
+## Emitted when the generator is finished. See also [method is_generating].
 signal finished
+
+## Emitted when the cellular automaton has finished executing a single iteration
+## step. This can be used to visualize the generation while it is happening. It is
+## used that exact way by [ProcGenVisualizer].
 signal automaton_iteration_finished
 
-const Context = preload("generator/context.gd")
+const _Context = preload("generator/context.gd")
 
 @export_tool_button("Generate") var _generate_callback = generate
+
+## The size of the generated grid. [b]Must[/b] be at least 10x10.
 @export var map_size: Vector2i = Vector2i(100, 100):
 	set(value):
-		map_size = Vector2i.ONE.max(value)
+		map_size = map_size.maxi(10)
 
-## Generates a new seed and writes it to [member ProcGen.seed] before running
+## Generates a new seed and writes it to [member seed] before running
 ## a generation.
 @export var generate_new_seed_on_run: bool = true
 
 ## Seed used by the generator's random number generator. Will be overwritten if
-## [member ProcGen.generate_new_seed_on_run] is set to [code]true[/code].
+## [member generate_new_seed_on_run] is set to [code]true[/code].
 @export var seed: int
 
 @export_group("Zones", "zone")
 
 ## The maximum ratio when splitting zones.
 ## (i.e. when splitting a zone into 2 subzones,
-## dictates how larger zone A can be over zone B) [br]
-## [code]0.5[/code] -> The split will always be in the middle [br]
-## [code]0.7[/code] -> The split will be between 30%~70% of the zone's length
+## dictates how larger zone A can be over zone B.)[br]
+## [code]0.5[/code] -> The split will always be in the middle. [br]
+## [code]0.7[/code] -> The split will be between 30%~70% of the zone's length.
 @export_range(0.5, 0.99) var zone_split_max_ratio: float = 0.6
 
 ## The chance that a zone uses the opposite split orientation as its parent. [br]
@@ -37,7 +104,7 @@ const Context = preload("generator/context.gd")
 ## [code]1.0[/code] -> Zone B will be split [i]vertically[/i], opposite to its
 ## parent. [br]
 ## [code]0.5[/code] -> 50% chance of being split either [i]horizontally[/i] or
-## [i]vertically[/i]
+## [i]vertically[/i].
 @export_range(0.0, 1.0, 0.01) var zone_parent_inverse_orientation_chance: float = 0.9
 
 @export_group("Rooms", "room")
@@ -48,7 +115,7 @@ const Context = preload("generator/context.gd")
 ## The ratio of how squared rooms are. Note that this can impact the
 ## target coverage of rooms. [br]
 ## [code]0.0[/code] -> No limits on the width to height ratio. [br]
-## [code]1.0[/code] -> Width and height are always the same (square rooms)
+## [code]1.0[/code] -> Width and height are always the same. (square rooms.)
 @export_range(0.0, 1.0) var room_min_squared_ratio: float = 0.3:
 	set(value):
 		room_min_squared_ratio = min(value, room_max_squared_ratio)
@@ -56,7 +123,7 @@ const Context = preload("generator/context.gd")
 ## The ratio of how squared rooms are. Note that this can impact the
 ## target coverage of rooms. [br]
 ## [code]0.0[/code] -> No limits on the width to height ratio. [br]
-## [code]1.0[/code] -> Width and height are always the same (square rooms)
+## [code]1.0[/code] -> Width and height are always the same. (square rooms.)
 @export_range(0.0, 1.0) var room_max_squared_ratio: float = 1.0:
 	set(value):
 		room_max_squared_ratio = max(value, room_min_squared_ratio)
@@ -82,34 +149,35 @@ const Context = preload("generator/context.gd")
 
 ## The minimum ratio, of overlap between 2 zones' edges to be considered
 ## adjacent. Adjacent zones are zones whose rooms can be connected with
-## corridors [br]
-## [code]0.3[/code] -> if at least 30% of a zone's edge touches another [br] [br]
+## corridors. [br]
+## [code]0.3[/code] -> if at least 30% of a zone's edge touches another. [br] [br]
 ## [b]Note[/b]: if set to [code]0.0[/code], every room will be considered
-## adjacent.
+## adjacent. Even if they phisically aren't.
 @export_range(0.0, 1.0, 0.01) var corridor_edge_overlap_min_ratio: float = 0.3
 
 ## The chance that an unused room connection is marked as used.
 ## This means that the path created by corridors will be cyclical. [br]
 ## [code]0.0[/code] -> No extra connection will be added. [br]
+## [code]0.12[/code] -> 12% chance to reuse each connection. [br]
 ## [code]1.0[/code] -> Every connection will be used.
 @export_range(0.0, 1.0, 0.01) var corridor_cycle_chance: float = 0.1
 
 @export_group("Automaton", "automaton")
 
-## The number of iteration to run the Cellular Automata. More iterations will
+## The number of iteration to run the Cellular Automaton. More iterations will
 ## lead to more "eroded" looking terrain. [code]0[/code] to disable it.
 @export_range(0, 1, 1, "or_greater") var automaton_iterations: int = 5
 
 ## The minimum number of neighboring cells set to full for the current cell to
 ## also be full. (i.e. given a cell at a given position,
-## how many surrounding cells needs to be full for it to be full as well)
+## how many surrounding cells needs to be full for it to be full as well.)
 @export_range(0, 8) var automaton_cell_min_neighbors: int = 5:
 	set(value):
 		automaton_cell_min_neighbors = min(value, automaton_cell_max_neighbors)
 
 ## The maximum number of neighboring cells set to full for the current cell to
 ## also be full. (i.e. given a cell at a given position,
-## how many surrounding cells needs to be full for it to be empty)
+## how many surrounding cells needs to be full for it to be empty.)
 @export_range(0, 8) var automaton_cell_max_neighbors: int = 8:
 	set(value):
 		automaton_cell_max_neighbors = max(value, automaton_cell_min_neighbors)
@@ -121,7 +189,7 @@ const Context = preload("generator/context.gd")
 
 ## If set, will fill up isolated holes in the grid at the end of the all
 ## automaton iterations.
-## [br][br][b]Note[/b]: If [member ProcGen.automaton_threads] if at least
+## [br][br][b]Note[/b]: If [member automaton_threads] if at least
 ## [code]1[/code], then a separate thread is used to compute the flood fill.
 @export var automaton_flood_fill: bool = true
 
@@ -150,7 +218,7 @@ const Context = preload("generator/context.gd")
 
 ## Amount to expand the [i]mutable[/i] width of corridors. [br]
 ## Non-fixed width can change during the generation. this amount expands on
-## [member ProcGen.automaton_corridor_fixed_width_expand].
+## [member automaton_corridor_fixed_width_expand]. [br]
 ## [code]0[/code] -> fixed_width + 1 unit wide corridors at the start. [br]
 ## [code]1[/code] -> fixed_width + 3 unit wide corridors at the start. [br]
 ## [code]3[/code] -> fixed_width + 5 unit wide corridors at the start. [br]
@@ -171,13 +239,12 @@ func _ready() -> void:
 		generate()
 
 
-## Runs a generation using the provided settings. [br]
-## TODO
+## Runs a procedural generation using the provided settings.
 func generate():
 	if is_generating():
 		push_error("Generator is already running. Ignoring call to generate()")
 		return
-	var ctx := Context.new()
+	var ctx := _Context.new()
 
 	ctx.map_size = map_size
 
@@ -227,7 +294,7 @@ func get_rooms() -> Array[Rect2i]:
 
 ## Returns points that have been designated as corridors.
 ## These points (and the area around them defined by
-## [member ProcGen.automaton_corridor_fixed_width_expand])
+## [member automaton_corridor_fixed_width_expand])
 ## are [i]guaranteed[/i] to be empty space. [br]
 ## Returns an empty array if called before calling [method ProcGen.generate].
 func get_corridor_areas() -> Array[Vector2i]:
