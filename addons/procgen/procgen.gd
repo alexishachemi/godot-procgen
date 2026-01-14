@@ -78,7 +78,7 @@ const _Context = preload("generator/context.gd")
 ## The size of the generated grid. [b]Must[/b] be at least 10x10.
 @export var map_size: Vector2i = Vector2i(100, 100):
 	set(value):
-		map_size = map_size.maxi(10)
+		map_size = value.maxi(10)
 
 ## Generates a new seed and writes it to [member seed] before running a generation.
 @export var generate_seed: bool = true
